@@ -1,0 +1,12 @@
+
+# Output of tools/convert (derived from the original game data).
+/game/converted/
+
+*.love
+
+# Screenshots and logs from dev runs (tools/dev/love.ps1, --shot).
+/shots/
+
+AGENTS.md
+/.github/agents/
+/.vscode/

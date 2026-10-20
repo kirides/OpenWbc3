@@ -1,0 +1,12 @@
+{
+    "$schema": "https://raw.githubusercontent.com/LuaLS/vscode-lua/master/setting/schema.json",
+    "runtime.version": "LuaJIT",
+    "runtime.path": ["game/?.lua", "game/?/init.lua", "?.lua", "?/init.lua"],
+    "runtime.pathStrict": false,
+    "workspace.library": ["${3rd}/love2d/library", "docs/modding/luals"],
+    "workspace.checkThirdParty": false,
+    "workspace.ignoreDir": [".git", "shots", "game/converted", "dump"],
+    "diagnostics.globals": ["love"],
+    "diagnostics.disable": [],
+    "completion.requireSeparator": "."
+}
