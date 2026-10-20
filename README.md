@@ -1,7 +1,7 @@
 # openwbc3
 
 An open-source re-implementation of the **Warlords Battlecry III** engine in Lua on
-[LÖVE](https://love2d.org/) 11.5. It uses the data files of an original installation
+[LÖVE](https://love2d.org/) 12.0 (pre-release). It uses the data files of an original installation
 (the GOG release) at runtime; no game assets are part of this repository.
 
 Status: early, but playable skirmishes. What works so far:
@@ -86,7 +86,10 @@ Options: volumes, scroll speed, full screen and vsync (stored in `openwbc3.ini`)
 
 ## Running
 
-1. Install LÖVE 11.5.
+1. Get LÖVE 12.0 (codename "Bestest Friend"), which is not released yet, so you need a pre-release build.
+   See the [LÖVE 12.0 wiki page](https://love2d.org/wiki/12.0) and the [LÖVE GitHub repository](https://github.com/love2d/love).
+   Download either the work-in-progress [GitHub Actions builds](https://github.com/love2d/love/actions?query=branch%3Amain+event%3Apush)
+   or the unofficial [nightly builds](https://nightly.link/love2d/love/workflows/main/main).
 2. Have Warlords Battlecry III installed (GOG). The game folder is found through the GOG
    registry key or common install paths; otherwise pass it explicitly:
 
@@ -171,7 +174,7 @@ broken libtheora encoder that produces undecodable video; the converter checks
 every video it writes, reports this and deletes the broken file. Existing `.ogv` files are
 not re-checked or re-converted unless `--force` is given. Recent gyan.dev / BtbN builds work.
 
-LÖVE 11.5 has no Opus decoder, so audio is converted to Vorbis.
+LÖVE has no Opus decoder, so audio is converted to Vorbis.
 
 ## Layout
 

@@ -25,7 +25,7 @@ for ($i = 0; $i -lt $args.Count; $i++) {
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $lovec = (Get-Command lovec -ErrorAction SilentlyContinue).Source
 if (-not $lovec) { $lovec = Join-Path $env:ProgramFiles "LOVE\lovec.exe" }
-if (-not (Test-Path $lovec)) { Write-Error "lovec.exe not found (install LÖVE 11.5)"; exit 127 }
+if (-not (Test-Path $lovec)) { Write-Error "lovec.exe not found (install a LÖVE 12.0 pre-release)"; exit 127 }
 
 $psi = [System.Diagnostics.ProcessStartInfo]::new($lovec)
 $psi.WorkingDirectory = $root

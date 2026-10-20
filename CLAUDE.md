@@ -1,7 +1,7 @@
 # openwbc3 – notes for coding agents
 
 A clean, MIT-licensed re-implementation of the **Warlords Battlecry III** engine in Lua on
-LÖVE 12.0 (LuaJIT: Lua 5.1 + `ffi` + `bit`). The original game's data (GOG install) is read
+LÖVE 12.0 pre-releases (unreleased, codename "Bestest Friend"; LuaJIT: Lua 5.1 + `ffi` + `bit`). The original game's data (GOG install) is read
 at runtime; nothing of it is in this repository. `README.md` has the player-facing feature list
 and controls; this file is the map for working on the code.
 
