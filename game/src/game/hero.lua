@@ -641,6 +641,15 @@ function Hero:give(item)
     return false
 end
 
+-- Puts an item into the backpack without wearing it (the chest dialog: it may be meant for selling, not for using).
+---@param item table
+---@return boolean
+function Hero:stow(item)
+    if #self.pack >= M.PACK_SIZE then return false end
+    self.pack[#self.pack + 1] = item
+    return true
+end
+
 ---@return boolean
 function Hero:packFull() return #self.pack >= M.PACK_SIZE end
 

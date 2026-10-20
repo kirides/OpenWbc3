@@ -19,6 +19,8 @@ local spells = require("src.game.spells")
 local music = require("src.audio.music")
 local sound = require("src.audio.sound")
 local dropdown = require("src.ui.dropdown")
+local l10n = require("src.game.l10n")
+local own = l10n.own
 
 -- The open dialog of the map (one table; which fields are set depends on `kind`).
 ---@class CampaignMapDialog
@@ -81,20 +83,28 @@ local BM = { MAP = 721, TOP = 725, BOTTOM = 722, LEFT = 723, RIGHT = 724, MARKER
              DIALOG = 718, JOURNAL = 716, POPUP = 711, BIGBUTTON = 719, ICONS_SMALL = 737, ICONS_LARGE = 738 }
 -- icons of ActionIcons{Small,Large}.bmp (11 of them: 22x15 and 36x30)
 local ICON = { message = 0, xp = 1, retinue = 2, battle = 3, mercenary = 5, item = 6, info = 10 }
-local REL_LABEL = { ally = "Ally", friend = "Friend", neutral = "Neutral", enemy = "Enemy" }
+-- the relation names of the More Info scroll (texts 318 / 2..5)
+local REL_LABEL = { ally = { 2, "Ally" }, friend = { 3, "Friend" }, neutral = { 4, "Neutral" }, enemy = { 5, "Enemy" } }
 local VX, VY, VW, VH = 15, 42, 770, 516           -- map viewport
 local MAP = 1200
 
+-- the campaign menu: label and help line as XCI texts { resource, string, English fallback } (TXT_CAMPAIGN_* 313..344)
 local MENU_ITEMS = {
-    { id = "bonuses", label = "View Bonuses", help = "View the bonuses you have collected." },
-    { id = "journal", label = "View Journal", help = "Read the journal of your adventures." },
-    { id = "diplomacy", label = "Diplomacy", help = "View information about your relationship with other races." },
-    { id = "options", label = "Options", help = "Change sound and game options." },
-    { id = "hero", label = "Hero Information", help = "Look at your hero." },
-    { id = "stash", label = "Your Item Stash", help = "Look through the items you are carrying with you." },
-    { id = "hint", label = "Hint", help = "Get a hint about what to do next." },
-    { id = "exit", label = "Exit", help = "Return to the main menu." },
+    { id = "bonuses", label = { 314, 0, "View Bonuses" },
+      help = { 327, 5, "View information about the bonuses you have received." } },
+    { id = "journal", label = { 314, 1, "View Journal" }, help = { 327, 4, "View your travel journal." } },
+    { id = "diplomacy", label = { 314, 2, "Diplomacy" },
+      help = { 327, 6, "View information about your relationship with other races." } },
+    { id = "options", label = { 314, 3, "Options" }, help = { 327, 7, "View and change your campaign options." } },
+    { id = "hero", label = { 314, 7, "Hero Information" }, help = { 313, 7, "View information about your hero." } },
+    { id = "stash", label = { 343, 2, "Your Item Stash" },
+      help = { 343, 3, "View and move the items your hero carries and stores in his stash." } },
+    { id = "hint", label = { 344, 0, "Hint" }, help = { 344, 3, "A hint to help you along your way." } },
+    { id = "exit", label = { 314, 4, "Exit" }, help = { 314, 5, "Return to the main menu (changes are saved)." } },
 }
+
+-- XCI text `sub` of resource `id` with an English fallback.
+local function X(id, sub, fallback) return UI.text(id, sub) or fallback end
 
 local function img(id) return UI.bitmap(id) end
 
@@ -285,7 +295,10 @@ function S:drawMap()
             if hover then
                 self.help = loc.name
                 for _, l in ipairs(cur.links) do
-                    if l.to == code then self.help = ("%s - %d days"):format(loc.name, l.days) end
+                    if l.to == code then
+                        self.help = l.days == 1 and X(327, 3, "%s.  Traveling time : 1 day."):format(loc.name)
+                            or X(327, 2, "%s.  Traveling time : %d days."):format(loc.name, l.days)
+                    end
                 end
             end
         end
@@ -308,10 +321,10 @@ function S:drawFrames()
     love.graphics.setColor(menuHover and 0.5 or 0.38, 0.05, 0.05, 0.95)
     love.graphics.rectangle("fill", 93, 4, 158, 22)
     love.graphics.setColor(1, 1, 1)
-    fonts.print(5, "Menu", 93, 4 + fonts.middleY(5, 22), "center", 158)
-    fonts.print(5, ("%d Crowns"):format(st.crowns), 317, 4 + fonts.middleY(5, 22), "center", 159)
-    fonts.print(5, ("Year %d   Day %d"):format(st.year, st.day), 551, 4 + fonts.middleY(5, 22), "center", 158)
-    if menuHover then self.help = "Open the campaign menu." end
+    fonts.print(5, X(313, 0, "Menu"), 93, 4 + fonts.middleY(5, 22), "center", 158)
+    fonts.print(5, X(313, 2, "%d Crowns"):format(st.crowns), 317, 4 + fonts.middleY(5, 22), "center", 159)
+    fonts.print(5, X(313, 1, "Year %d   Day %d"):format(st.year, st.day), 551, 4 + fonts.middleY(5, 22), "center", 158)
+    if menuHover then self.help = own("Open the campaign menu.") end
     fonts.print(5, self.help or "", 15, 578 + fonts.middleY(5, 20), "center", 770)
 end
 
@@ -326,11 +339,11 @@ function S:drawMenu()
         self.hits[#self.hits + 1] = { id = "menu_" .. item.id, x = 100, y = y, w = 150, h = 20 }
         if hv then
             g.setColor(1, 0.95, 0.7)
-            self.help = item.help
+            self.help = X(item.help[1], item.help[2], item.help[3])
         else
             g.setColor(0.85, 0.8, 0.65)
         end
-        fonts.print(5, item.label, 93, y + fonts.middleY(5, 20), "center", 165)
+        fonts.print(5, X(item.label[1], item.label[2], item.label[3]), 93, y + fonts.middleY(5, 20), "center", 165)
         g.setColor(1, 1, 1)
     end
     -- once the campaign can be finished, the menu offers to end it (the original's resign option)
@@ -338,8 +351,8 @@ function S:drawMenu()
         local y = 40 + #MENU_ITEMS * 20 + 6
         local hv = kit.inside(self, 100, y, 150, 20)
         self.hits[#self.hits + 1] = { id = "menu_resign", x = 100, y = y, w = 150, h = 20 }
-        fonts.print(5, hv and "Finish Campaign" or "Finish Campaign", 93, y + fonts.middleY(5, 20), "center", 165)
-        if hv then self.help = "End the campaign and see the credits." end
+        fonts.print(5, own("Finish Campaign"), 93, y + fonts.middleY(5, 20), "center", 165)
+        if hv then self.help = own("End the campaign and see the credits.") end
     end
 end
 
@@ -450,10 +463,10 @@ function S:drawLocationDialog()
             self.help = act.help or ""
         end
     end
-    if self:popupRow("moreinfo", "More Info...", x + 7, y + 36 + shown * 20, ICON.info) then
-        self.help = "Read about this place."
+    if self:popupRow("moreinfo", X(313, 5, "More Info..."), x + 7, y + 36 + shown * 20, ICON.info) then
+        self.help = X(327, 0, "View more information about this location.")
     end
-    self:popupRow("cancel", "Cancel", x + 7, y + cancelY)
+    self:popupRow("cancel", l10n.game("0087", "Cancel"), x + 7, y + cancelY)
 end
 
 local function paragraphLines(font, text, width)
@@ -492,8 +505,9 @@ function S:drawMoreInfo()
     if loc.owner then
         local race = classes.RACE_NAMES[loc.owner]
         if race then
-            fonts.print(5, "Race: " .. race, x, y + 271, "center", 400)
-            fonts.print(5, "Diplomatic Rating: " .. (REL_LABEL[self.state:relation(loc.owner)] or "Neutral"), x, y + 291, "center", 400)
+            local rel = REL_LABEL[self.state:relation(loc.owner)] or REL_LABEL.neutral
+            fonts.print(5, X(318, 0, "Race: %s"):format(race), x, y + 271, "center", 400)
+            fonts.print(5, X(318, 1, "Diplomatic Rating: %s"):format(X(318, rel[1], rel[2])), x, y + 291, "center", 400)
         end
     end
     local battle = false
@@ -596,7 +610,7 @@ function S:drawNewBattle()
         cy = cy + 20
     end
     fonts.print(5, nbText(316, 6, "Race:"), x, y + 320, "right", 173)
-    local note = d.note or (not d.canPay and "You cannot afford the entry fee.") or nil
+    local note = d.note or (not d.canPay and own("You cannot afford the entry fee.")) or nil
     if note then fonts.print(2, note, x, y + 380, "center", 696) end
     dropdown.draw()
 end
@@ -609,7 +623,7 @@ function S:drawActionDialog()
     local x, y = self:frame(act.name)
     if act.type == "message" then
         line(self, act.message or act.description or "", x + 58, y + 70, 580, 5)
-        self:button("cancel", "Close", x + 268, y + 440, 160, 30)
+        self:button("cancel", X(320, 0, "Close"), x + 268, y + 440, 160, 30)
     elseif act.type == "choice" then
         line(self, act.message or "", x + 58, y + 70, 580, 5)
         for i, o in ipairs(act.options) do
@@ -621,18 +635,19 @@ function S:drawActionDialog()
         local ty = y + 90 + h
         if act.type == "retinue" and act.unit then
             local t = gamedata.army(act.unit.code)
-            fonts.print(5, ("%s (level %d)"):format(t and t.name or act.unit.code, act.unit.level), x + 60, ty)
+            fonts.print(5, l10n.game("0722", "Level %d %s"):format(act.unit.level, t and t.name or act.unit.code), x + 60, ty)
         end
-        fonts.print(5, ("Cost: %d Crowns"):format(cost), x + 60, ty + 26)
-        fonts.print(2, ("You have %d Crowns."):format(st.crowns), x + 60, ty + 54)
-        self:button("buy", act.type == "xp" and "Train" or "Hire", x + 120, y + 440, 160, 30, { disabled = st.crowns < cost })
-        self:button("cancel", "Leave", x + 416, y + 440, 160, 30)
+        fonts.print(5, X(330, 2, "Cost %d Crowns"):format(cost), x + 60, ty + 26)
+        fonts.print(2, l10n.game("0711", "Your treasury contains %d Crowns."):format(st.crowns), x + 60, ty + 54)
+        self:button("buy", act.type == "xp" and own("Train") or X(323, 3, "Hire"), x + 120, y + 440, 160, 30, { disabled = st.crowns < cost })
+        self:button("cancel", X(320, 0, "Close"), x + 416, y + 440, 160, 30)
         if d.note then fonts.print(2, d.note, x + 58, y + 410, "center", 580) end
     elseif act.type == "mercenary" then
-        fonts.print(5, ("You have %d Crowns."):format(st.crowns), x + 58, y + 62)
-        fonts.print(2, ("Companies waiting for the next battle: %d of %d"):format(#st.mercs, run.MERC_SLOTS), x + 360, y + 66)
+        fonts.print(5, l10n.game("0711", "Your treasury contains %d Crowns."):format(st.crowns), x + 58, y + 62)
+        fonts.print(2, X(321, 2, "You may hire up to %d bands of mercenaries for battle."):format(run.MERC_SLOTS) .. " "
+            .. X(321, 3, "You currently have %d."):format(#st.mercs), x + 58, y + 84)
         d.offers = d.offers or run.offers(st, act)
-        if #d.offers == 0 then fonts.print(5, "Nobody is looking for work today.", x + 58, y + 100) end
+        if #d.offers == 0 then fonts.print(5, own("Nobody is looking for work today."), x + 58, y + 100) end
         for i, m in ipairs(d.offers) do
             if i > 5 then break end
             local by = y + 96 + (i - 1) * 62
@@ -643,10 +658,10 @@ function S:drawActionDialog()
             local parts = {}
             for _, u in ipairs(m.units) do parts[#parts + 1] = u.text end
             fonts.print(2, table.concat(parts, "; "), x + 50, by + 28)
-            self:button("hire", ("Hire (%d)"):format(m.cost), x + 530, by + 14, 108, 28,
+            self:button("hire", ("%s (%d)"):format(X(323, 3, "Hire"), m.cost), x + 530, by + 14, 108, 28,
                         { disabled = st.crowns < m.cost or #st.mercs >= run.MERC_SLOTS }, i)
         end
-        self:button("cancel", "Leave", x + 268, y + 440, 160, 30)
+        self:button("cancel", X(320, 0, "Close"), x + 268, y + 440, 160, 30)
     elseif act.type == "item" then
         self:drawShop(x, y)
     end
@@ -658,9 +673,9 @@ function S:drawShop(x, y)
     local st = self.state
     local h = self:heroObject()
     d.stock = d.stock or run.shopItems(st, act)
-    fonts.print(5, ("You have %d Crowns."):format(st.crowns), x + 58, y + 56)
-    fonts.print(5, "For sale", x + 58, y + 84)
-    fonts.print(5, "Sell your items", x + 366, y + 84)
+    fonts.print(5, l10n.game("0711", "Your treasury contains %d Crowns."):format(st.crowns), x + 58, y + 56)
+    fonts.print(5, X(322, 1, "Buy Items"), x + 58, y + 84)
+    fonts.print(5, X(322, 0, "Sell Items"), x + 366, y + 84)
     local price = act.items and act.items.price or 100
     for i, id in ipairs(d.stock) do
         local it = items.get(id)
@@ -681,14 +696,14 @@ function S:drawShop(x, y)
         local it = items.get(id)
         if it then sellRow(it, "stash", i) end
     end
-    self:button("cancel", "Leave", x + 268, y + 440, 160, 30)
+    self:button("cancel", X(320, 0, "Close"), x + 268, y + 440, 160, 30)
     if d.note then fonts.print(2, d.note, x + 58, y + 410, "center", 580) end
 end
 
 function S:drawResult()
     local d = self.dialog --[[@as CampaignMapDialog]]
     local act = d.act --[[@as table]]
-    local x, y = self:frame(d.won and "Victory!" or "Defeat")
+    local x, y = self:frame(d.won and l10n.game("0728", "Victory") or l10n.game("0729", "Defeat"))
     fonts.print(5, act.name, x, y + 56, "center", 696)
     local ty = y + 92
     local jtext
@@ -697,22 +712,22 @@ function S:drawResult()
     end
     if jtext then ty = ty + line(self, jtext, x + 58, ty, 580, 5) + 10 end
     if d.won and #d.lines > 0 then
-        fonts.print(5, "You receive:", x + 58, ty)
+        fonts.print(5, own("You receive:"), x + 58, ty)
         for i, l in ipairs(d.lines) do fonts.print(5, l, x + 60, ty + 24 * i) end
     end
-    self:button("resultok", "Continue", x + 268, y + 440, 160, 30)
+    self:button("resultok", l10n.game("0315", "Continue"), x + 268, y + 440, 160, 30)
 end
 
 -- The end-of-campaign offer (the original's resign panel, PNL_CAMP_RESIGN): finish now for a reward, or keep playing.
 function S:drawResign()
     local d = self.dialog --[[@as CampaignMapDialog]]
     local left = self.state:missionsLeft()
-    local x, y = self:frame("Finish the Campaign?")
-    local body = (left <= 0) and "You have completed every mission. Do you wish to finish the campaign now?"
-        or ("You have finished all but %d of the campaign's missions. Do you wish to finish the campaign now?"):format(left)
+    local x, y = self:frame(own("Finish the Campaign?"))
+    local body = (left <= 0) and own("You have completed every mission. Do you wish to finish the campaign now?")
+        or own("You have finished all but %d of the campaign's missions. Do you wish to finish the campaign now?"):format(left)
     line(self, body, x + 58, y + 70, 580, 5)
-    self:button("resign", "Finish", x + 120, y + 440, 160, 30)
-    self:button("cancel", "Keep Playing", x + 416, y + 440, 160, 30)
+    self:button("resign", own("Finish"), x + 120, y + 440, 160, 30)
+    self:button("cancel", own("Keep Playing"), x + 416, y + 440, 160, 30)
 end
 
 -- The ambush dialog (rolled for by the travel start `FUN_0059d7d0`; the panel opens in its slide callback at
@@ -764,28 +779,28 @@ function S:drawJournal()
     g.rectangle("fill", 0, 0, 800, 600)
     g.setColor(1, 1, 1)
     if bg then g.draw(bg, x, y) else kit.panel(x, y, 557, 399) end
-    fonts.print(1, "Journal", x, y + 12, "center", 557)
+    fonts.print(1, own("Journal"), x, y + 12, "center", 557)
     local entries = self.state.journal
     d.scroll = math.max(0, math.min(math.max(0, #entries - 4), d.scroll or 0))
     local cy = y + 60
     local shown = 0
     for i = #entries - (d.scroll or 0), 1, -1 do
         local e = entries[i]
-        fonts.print(2, ("Year %d, day %d"):format(e.year, e.day), x + 58, cy)
-        if e.video then self:button("journalvideo", "Play video", x + 430, cy - 2, 108, 20, nil, i) end
+        fonts.print(2, X(313, 1, "Year %d   Day %d"):format(e.year, e.day), x + 58, cy)
+        if e.video then self:button("journalvideo", X(320, 5, "Play Video"), x + 430, cy - 2, 108, 20, nil, i) end
         cy = cy + 16
         cy = cy + line(self, e.text, x + 58, cy, 480, 2, e.important and { 1, 0.9, 0.6 } or nil) + 12
         shown = shown + 1
         if cy > y + 340 then break end
     end
-    if #entries == 0 then fonts.print(5, "Nothing has been written yet.", x + 58, y + 80) end
-    self:button("scroll_up", "Newer", x + 58, y + 355, 100, 26, nil, -1)
-    self:button("scroll_down", "Older", x + 417, y + 355, 100, 26, nil, 1)
-    self:button("cancel", "Close", x + 218, y + 355, 120, 26)
+    if #entries == 0 then fonts.print(5, own("Nothing has been written yet."), x + 58, y + 80) end
+    self:button("scroll_up", own("Newer"), x + 58, y + 355, 100, 26, nil, -1)
+    self:button("scroll_down", own("Older"), x + 417, y + 355, 100, 26, nil, 1)
+    self:button("cancel", X(320, 0, "Close"), x + 218, y + 355, 120, 26)
 end
 
 function S:drawBonuses()
-    local x, y = self:frame("Bonuses")
+    local x, y = self:frame(X(326, 2, "Bonuses"))
     local n = 0
     for index = 0, 30 do
         local b = self.D.bonuses[index]
@@ -795,8 +810,8 @@ function S:drawBonuses()
             fonts.print(2, b.description, x + 70, y + 70 + (n - 1) * 44 + 22)
         end
     end
-    if n == 0 then fonts.print(5, "You have not collected any bonuses yet.", x + 50, y + 80) end
-    self:button("cancel", "Close", x + 268, y + 440, 160, 30)
+    if n == 0 then fonts.print(5, X(326, 3, "You have no bonuses."), x + 50, y + 80) end
+    self:button("cancel", X(320, 0, "Close"), x + 268, y + 440, 160, 30)
 end
 
 local COLUMNS = { "ally", "friend", "neutral", "enemy" }
@@ -834,32 +849,35 @@ end
 function S:drawHero()
     local x, y = self:frame(self.hero.name)
     local h = self:heroObject()
-    fonts.print(5, ("%s %s, level %d"):format(classes.RACE_NAMES[self.hero.race], self.hero.class, h.level), x, y + 56, "center", 696)
+    fonts.print(5, l10n.game("0722", "Level %d %s"):format(h.level, classes.RACE_NAMES[self.hero.race] .. " "
+        .. classes.className(self.hero.class)), x, y + 56, "center", 696)
     local a = h.attr
-    fonts.print(5, ("Strength %d    Dexterity %d    Intelligence %d    Charisma %d"):format(a.str, a.dex, a.int, a.cha), x, y + 90, "center", 696)
-    fonts.print(2, ("Experience %d / %s"):format(h.xp, h:nextLevelXp() and tostring(h:nextLevelXp()) or "-"), x, y + 118, "center", 696)
-    fonts.print(2, ("Unspent points: attributes %d, skills %d"):format(h.points.attr, h.points.skill), x, y + 136, "center", 696)
-    fonts.print(5, "Retinue", x + 50, y + 170)
+    fonts.print(5, table.concat({ l10n.game("0696", "Strength: %d"):format(a.str), l10n.game("0697", "Dexterity: %d"):format(a.dex),
+        l10n.game("0698", "Intelligence: %d"):format(a.int), l10n.game("0699", "Charisma: %d"):format(a.cha) }, "    "),
+        x, y + 90, "center", 696)
+    fonts.print(2, own("Experience %d / %s"):format(h.xp, h:nextLevelXp() and tostring(h:nextLevelXp()) or "-"), x, y + 118, "center", 696)
+    fonts.print(2, own("Unspent points: attributes %d, skills %d"):format(h.points.attr, h.points.skill), x, y + 136, "center", 696)
+    fonts.print(5, X(18, 4, "Retinue"), x + 50, y + 170)
     local row = 0
     for slot = 1, retinueMod.SLOTS do
         local r = self.hero.retinue and self.hero.retinue[slot]
         if r then
             local t = gamedata.army(r.code)
             local name = (r.name and r.name ~= "") and r.name or (t and t.name or r.code)
-            fonts.print(2, ("%s, %s (level %d)"):format(name, t and t.name or r.code, (r.level or 0) + 1), x + 70, y + 196 + row * 16)
+            fonts.print(2, ("%s, %s"):format(name, l10n.game("0722", "Level %d %s"):format((r.level or 0) + 1, t and t.name or r.code)), x + 70, y + 196 + row * 16)
             row = row + 1
         end
     end
-    if row == 0 then fonts.print(2, "You travel alone.", x + 70, y + 196) end
-    self:button("graveyard", "Graveyard", x + 50, y + 440, 160, 30)
-    self:button("cancel", "Close", x + 268, y + 440, 160, 30)
+    if row == 0 then fonts.print(2, own("You travel alone."), x + 70, y + 196) end
+    self:button("graveyard", X(280, 2, "Graveyard"), x + 50, y + 440, 160, 30)
+    self:button("cancel", X(320, 0, "Close"), x + 268, y + 440, 160, 30)
 end
 
 function S:drawStash()
-    local x, y = self:frame("Your Item Stash")
+    local x, y = self:frame(X(343, 2, "Your Item Stash"))
     local h = self:heroObject()
-    fonts.print(5, "Stash (click to take)", x + 58, y + 56)
-    fonts.print(5, "Backpack (click to store)", x + 366, y + 56)
+    fonts.print(5, own("Stash (click to take)"), x + 58, y + 56)
+    fonts.print(5, own("Backpack (click to store)"), x + 366, y + 56)
     for i, id in ipairs(self.state.stash) do
         if i > 11 then break end
         local it = items.get(id)
@@ -868,24 +886,24 @@ function S:drawStash()
     for i, it in ipairs(h.pack) do
         self:button("store", it.name, x + 366, y + 84 + (i - 1) * 32, 268, 28, nil, i)
     end
-    self:button("cancel", "Close", x + 268, y + 440, 160, 30)
+    self:button("cancel", X(320, 0, "Close"), x + 268, y + 440, 160, 30)
     local d = self.dialog --[[@as CampaignMapDialog]]
     if d.note then fonts.print(2, d.note, x, y + 410, "center", 696) end
 end
 
 function S:drawHint()
-    local x, y = self:frame("Hint")
+    local x, y = self:frame(X(344, 0, "Hint"))
     local hints = self.state:hints()
     local cy = y + 70
     for _, h in ipairs(hints) do
         for _, l in ipairs(h.lines) do cy = cy + line(self, l, x + 58, cy, 580, 5) + 8 end
         if h.more then
-            self:button("morehint", "Tell me more", x + 58, cy, 160, 28, nil, h.index)
+            self:button("morehint", X(344, 2, "More Hints..."), x + 58, cy, 160, 28, nil, h.index)
             cy = cy + 40
         end
     end
-    if #hints == 0 then fonts.print(5, "You are on your own now.", x + 58, y + 80) end
-    self:button("cancel", "Close", x + 268, y + 440, 160, 30)
+    if #hints == 0 then fonts.print(5, X(344, 1, "There are no hints available."), x + 58, y + 80) end
+    self:button("cancel", X(320, 0, "Close"), x + 268, y + 440, 160, 30)
 end
 
 local DRAW = {
@@ -1137,7 +1155,7 @@ function S:act(id, extra)
         self.dialog = { kind = "location" }
     elseif id == "option" then
         run.chooseOption(st, d.act, extra)
-        self.dialog = { kind = "action", act = { type = "message", name = d.act.name, message = "Your answer is noted." } }
+        self.dialog = { kind = "action", act = { type = "message", name = d.act.name, message = own("Your answer is noted.") } }
     elseif id == "buy" then
         local cost = d.act.data and d.act.data.cost or 0
         if st.crowns >= cost then
@@ -1146,13 +1164,13 @@ function S:act(id, extra)
                 local h = self:heroObject()
                 h:addXp(cost * 5 * math.max(1, h.level))
                 self:saveHero(h)
-                d.note = "Your training is complete."
+                d.note = own("Your training is complete.")
             elseif d.act.unit then
                 local rec = profile.get(self.hero.id) or self.hero
                 retinueMod.give(rec, retinueMod.fresh(d.act.unit.code, d.act.unit.level), retinueMod.slotsOf(rec))
                 profile.update(rec)
                 self.hero = rec
-                d.note = "A new recruit joins your retinue."
+                d.note = own("A new recruit joins your retinue.")
             end
             st:save()
         end
@@ -1188,7 +1206,7 @@ function S:act(id, extra)
             self:saveHero(h)
             st:save()
         else
-            d.note = "Your backpack is full."
+            d.note = l10n.game("0732", "Your backpack is full.")
         end
     elseif id == "store" then
         local h = self:heroObject()
@@ -1255,7 +1273,7 @@ function S:mousereleased(x, y, button)
                 for _, l in ipairs(self:location().links) do
                     if l.to == m.code and self.state:locationOpen(m.code) then self:startTravel(l) return end
                 end
-                self.help = "You cannot travel there directly."
+                self.help = own("You cannot travel there directly.")
             end
             return
         end

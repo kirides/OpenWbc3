@@ -87,6 +87,22 @@ function M.list()
     return cache.legacy
 end
 
+-- The localised name of class `name`: the XCI text resources 8..11 hold the class names, eight each, in class
+-- number order (falls back to the id where the interface is not loaded, e.g. headless runs).
+local CLASS_GROUP_TEXT = { 8, 9, 10, 11 }
+---@param name string?
+---@return string
+function M.className(name)
+    local ui = package.loaded["src.ui.interface"]
+    for i, c in ipairs(M.list()) do
+        if c[1] == name then
+            local n = i - 1
+            return ui and ui.ui and ui.text(CLASS_GROUP_TEXT[math.floor(n / 8) + 1], n % 8) or c[1]
+        end
+    end
+    return name or ""
+end
+
 ---@param broad integer
 ---@return ClassRow[]
 function M.of(broad)

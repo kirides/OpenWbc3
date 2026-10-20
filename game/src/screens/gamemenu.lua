@@ -10,14 +10,15 @@ local frame = require("src.ui.frame")
 ---@field panel Panel
 local S = { overlay = true }
 
+-- labels are Game.txt keys of the original's game menu strings, so they follow the language setting
 local ENTRIES = {
-    { id = "resume", label = "Resume" },
-    { id = "hero", label = "Hero" },
-    { id = "save", label = "Save Game" },
-    { id = "load", label = "Load Game" },
-    { id = "options", label = "Options" },
-    { id = "resign", label = "Resign" },
-    { id = "leave", label = "Leave Battle" },
+    { id = "resume", key = "0318", label = "Resume Game" },
+    { id = "hero", key = "0939", label = "Hero" },
+    { id = "save", key = "0307", label = "Save Game" },
+    { id = "load", key = "0306", label = "Load Game" },
+    { id = "options", key = "0319", label = "Options" },
+    { id = "resign", key = "0308", label = "Resign" },
+    { id = "leave", key = "0321", label = "Quit" },
 }
 
 ---@param battle BattleScreen
@@ -37,36 +38,38 @@ function S:build(mode)
     end
     local step = #entries > 6 and 34 or 38
     local strings = require("src.game.strings")
+    local function str(key, fallback) return strings.get("Game.txt", key) or fallback end
     local p = UI.panel("PNL_OKAYCANCEL", { onButton = function(name) self:button(name) end })
     ---@cast p -nil
     self.panel = p
     local FX, FY, FW, FH = frame.X, frame.Y, frame.W, frame.H
     if mode == "menu" then
-        frame.prepare(p, "Menu")
+        frame.prepare(p, str("0316", "Game Menu"))
         -- Resume on top and Leave Battle at the bottom, each set off from the rest by half a button height
         local y = 82
         for i, e in ipairs(entries) do
             local it = p:add("BUTT_OKAY_180", FX + (FW - 180) / 2, FY + y, "MENU_" .. e.id)
             ---@cast it -nil
-            p.itemStrings[it] = e.id == "resign" and strings.get("Game.txt", "0308") or e.label
+            p.itemStrings[it] = str(e.key, e.label)
             y = y + step
             if i == 1 or i == #entries - 1 then y = y + 18 end
         end
     else
         local resign = mode == "resign"
-        frame.prepare(p, resign and strings.get("Game.txt", "0308") or "Leave the battle?")
+        frame.prepare(p, resign and str("0308", "Resign") or str("0321", "Quit") .. "?")
         local text = p:all("STR_MEDIUM500")[1]
         frame.place(p, text, (FW - text.ob.w) / 2, 120)
         p.align[text] = "center"
-        p.itemStrings[text] = resign and ((strings.get("Game.txt", "0313") or "") .. " " .. (strings.get("Game.txt", "0314") or ""))
-            or "Your hero keeps its experience."
+        -- leaving keeps the hero's experience: openwbc3's own note, the original has no such string (its leave is resign)
+        p.itemStrings[text] = resign and (str("0313", "") .. " " .. str("0314", ""))
+            or require("src.game.l10n").own("Your hero keeps its experience.")
         local by = FH - 36 - 22
         local no = p:add("BUTT_CANCEL_180", FX + 40, FY + by, "LEAVE_NO")
         local yes = p:add("BUTT_OKAY_180", FX + FW - 40 - 180, FY + by, resign and "RESIGN_YES" or "LEAVE_YES")
         ---@cast no -nil
         ---@cast yes -nil
-        p.itemStrings[no] = "Stay"
-        p.itemStrings[yes] = resign and strings.get("Game.txt", "0308") or "Leave"
+        p.itemStrings[no] = str("0087", "Cancel")
+        p.itemStrings[yes] = resign and str("0308", "Resign") or str("0321", "Quit")
     end
 end
 

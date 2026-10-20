@@ -3,6 +3,7 @@ local screens = require("src.core.screens")
 local fonts = require("src.ui.fonts")
 local savegame = require("src.game.savegame")
 local profile = require("src.game.profile")
+local l10n = require("src.game.l10n")
 
 ---@class SaveSlotsScreen: Screen
 ---@field mode "save"|"load"
@@ -53,9 +54,9 @@ function S:activate(row)
     if self.mode == "save" then
         if self.battle:saveGame(i) then
             self:refresh()
-            self.notice = "Game saved"
+            self.notice = l10n.game("0304", "Game Saved")
         else
-            self.notice = "Saving failed"
+            self.notice = l10n.game("0305", "Error - Game NOT Saved")
         end
     elseif self.slots[i] then
         local battle = self.battle
@@ -65,7 +66,7 @@ function S:activate(row)
             screens.pop()                  -- the battle
         end
         local ok, why = savegame.start(i)
-            if not ok then self.notice = why and ("Loading failed: " .. why) or "Loading failed" end
+            if not ok then self.notice = why and l10n.own("Loading failed: %s"):format(why) or l10n.own("Loading failed") end
     end
 end
 
@@ -83,12 +84,12 @@ function S:draw()
     g.rectangle("fill", 0, 0, W, H)
     g.setFont(self.title)
     g.setColor(1, 0.85, 0.55)
-    g.printf(self.mode == "save" and "Save Game" or "Load Game", 0, 50, W, "center")
+    g.printf(self.mode == "save" and l10n.game("0307", "Save Game") or l10n.game("0306", "Load Game"), 0, 50, W, "center")
     g.setFont(self.font)
     local lx = self:left()
     if #self.rows == 0 then
         g.setColor(0.5, 0.5, 0.5)
-        g.printf("No saved games for this hero", 0, TOP + 8, W, "center")
+        g.printf(l10n.own("No saved games for this hero"), 0, TOP + 8, W, "center")
     end
     for r, i in ipairs(self.rows) do
         local y = TOP + (r - 1) * ROW_H

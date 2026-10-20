@@ -28,6 +28,7 @@ local UI = require("src.ui.interface")
 local spellbar = require("src.ui.spellbar")
 local sound = require("src.audio.sound")
 local strings = require("src.game.strings")
+local l10n = require("src.game.l10n")
 local widgets = require("src.ui.widgets")
 local walls = require("src.game.walls")
 
@@ -113,7 +114,8 @@ end
 ---@field x integer
 ---@field y integer
 ---@field row integer          row of Panel_Menu.bmp
----@field tip string
+---@field tip string           English tooltip (an own text, see src/game/l10n.lua)
+---@field key string?          the Game.txt line of the tooltip, where the original has one
 
 ---@class HUDOverlay          a tutorial text box with a pointer line over the production / construction dialog
 ---@field x number
@@ -345,7 +347,7 @@ function HUD:commands()
         if self.mode == "formations" and group then
             -- formation panel: the eight formations and Previous
             for i, kind in ipairs(formation.KINDS) do
-                cmds[i] = { icon = CPI.FORMATION_BLOCK + i - 1, action = "formation:" .. i, tip = formation.NAMES[kind] }
+                cmds[i] = { icon = CPI.FORMATION_BLOCK + i - 1, action = "formation:" .. i, tip = l10n.game(("%04d"):format(358 + i), formation.NAMES[kind]) }
             end
             cmds[9] = { icon = CPI.PREVIOUS, action = "previous" }
             return cmds
@@ -486,7 +488,7 @@ function HUD:runCommand(action)
                     and #world.eco:conversionTargets(u) > 0 then any = true break end
             end
             if not any then
-                screen:notify("Nothing to convert nearby")
+                screen:notify(l10n.game("0065", "There is nothing here to convert..."))
                 return
             end
         end
@@ -822,8 +824,8 @@ end
 local PBUTTONS = {
     { id = "hero", x = 150, y = 507, row = 2, tip = "Hero: stats and items (I)" },
     { id = "skills", x = 150, y = 547, row = 3, tip = "Hero: skills" },
-    { id = "pause", x = 620, y = 507, row = 1, tip = "Pause (P)" },
-    { id = "menu", x = 620, y = 545, row = 0, tip = "Menu (Esc)" },
+    { id = "pause", x = 620, y = 507, row = 1, tip = "Pause (P)", key = "0317" },       -- Game.txt "Pause Game"
+    { id = "menu", x = 620, y = 545, row = 0, tip = "Menu (Esc)", key = "0316" },       -- Game.txt "Game Menu"
 }
 
 ---@return HUDPanelButton?
@@ -1280,21 +1282,12 @@ end
 -- with a level > 0 as "<Game.txt 759 + id> +<level>" (`FUN_00556c90`, format " +%d") in FO_MEDIUM, two columns 140
 -- apart, 18 per row.
 local INFO_X, INFO_Y = AREA_X + 14, AREA_Y + 5            -- header of an info-area page
-local CLASS_GROUP_TEXT = { 8, 9, 10, 11 }                  -- XCI text resources of the class names (8 per resource)
 
 local function raceName(race)
     return (race < 8 and UI.text(15, race) or UI.text(104, race - 8)) or classes.RACE_NAMES[race] or "?"
 end
 
-local function className(name)
-    for i, c in ipairs(classes.list()) do
-        if c[1] == name then
-            local n = i - 1
-            return UI.text(CLASS_GROUP_TEXT[math.floor(n / 8) + 1], n % 8) or name
-        end
-    end
-    return name or ""
-end
+local className = classes.className
 
 function HUD:drawHeroOverview(u)
     local h = u.h
@@ -2152,9 +2145,10 @@ function HUD:drawCommandTip()
         self:tooltip(spellbar.tooltipLines(self, self.hoverSpell), mx, my - 120 * self.s)
         return
     end
-    if self.hoverPanel and not self.dialog then
+    local pb = self.hoverPanel
+    if pb and not self.dialog then
         local mx, my = love.mouse.getPosition()
-        self:tooltip({ self.hoverPanel.tip }, mx, my - 50 * self.s)
+        self:tooltip({ pb.key and l10n.game(pb.key, pb.tip) or l10n.own(pb.tip) }, mx, my - 50 * self.s)
         return
     end
     if self.dialog or not self.hoverButton then return end
@@ -2224,7 +2218,7 @@ function HUD:castSpell(id)
     if not hero or not hero.h or not id then return end
     local ok, why = spells.canCast(hero, id)
     if not ok then
-        screen:notify(why == "mana" and "Not enough mana" or "Cannot cast now", 2)
+        screen:notify(l10n.own(why == "mana" and "Not enough mana" or "Cannot cast now"), 2)
         if why == "mana" then require("src.audio.voices").say(hero, "Mana") end    -- the hero's Mana speech
         if why == "recovering" and screen.fx then screen.fx:recovering(hero) end   -- the recovering text over the hero
         sound.play("Assets/SoundFX.xcr", "Error.wav")
@@ -2238,7 +2232,7 @@ function HUD:castSpell(id)
         require("src.core.screens").push(require("src.screens.spellchoice"), screen, hero, id)
     else
         self.mode, self.spellId = "spell", id
-        screen:notify(({ ground = "Choose a place for %s", enemy = "Choose an enemy for %s", ally = "Choose a unit for %s" })[kind]
+        screen:notify(l10n.own(({ ground = "Choose a place for %s", enemy = "Choose an enemy for %s", ally = "Choose a unit for %s" })[kind])
             :format(spells.name(id)), 3)
     end
 end

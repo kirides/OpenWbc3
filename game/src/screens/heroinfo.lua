@@ -17,6 +17,7 @@ local profile = require("src.game.profile")
 local portraits = require("src.ui.portraits")
 local sound = require("src.audio.sound")
 local music = require("src.audio.music")
+local l10n = require("src.game.l10n")
 
 ---@class HeroInfoScreen: Screen
 ---@field battle BattleScreen?       nil: read-only for a profile hero (hero selection)
@@ -62,7 +63,7 @@ function S:enter(battle, tab, rec)
         self.world = battle.world
         self.hero = self.world.eco:heroAlive(self.world.player)
         self.h = self.hero and self.hero.h
-        self.name = self.hero and (self.hero.name or "Hero") or "Fallen hero"
+        self.name = self.hero and (self.hero.name or l10n.game("0939", "Hero")) or l10n.own("Fallen hero")
         self.race = self.world.sides[self.world.player].race
         local cur = self.world.opts.profile and profile.current()
         if cur and cur.race == self.race then self.rec = cur end
@@ -90,7 +91,7 @@ function S:enter(battle, tab, rec)
             panel:setTextAt("STR_MEDIUM200", vx, ly, value)
         end
         put(200, 158, UI.text(6, 3) or "Race:", 328, classes.RACE_NAMES[self.race] or gamedata.RACES[self.race] or "?")
-        put(200, 178, UI.text(6, 4) or "Class:", 328, h.class)
+        put(200, 178, UI.text(6, 4) or "Class:", 328, classes.className(h.class))
         put(200, 198, UI.text(6, 5) or "Level:", 328, tostring(h.level))
         put(450, 178, UI.text(6, 6) or "XP:", 578, tostring(h.xp))
         local nxt = h:nextLevelXp()
@@ -370,7 +371,7 @@ function S:draw()
             if item then widgets.tooltip(self:itemTip(item), mx, my) end
         end
     else
-        text(self.fMed, "Your hero has fallen.", CX, CY + 80, "center", 600)
+        text(self.fMed, l10n.own("Your hero has fallen."), CX, CY + 80, "center", 600)
     end
     UI.finish()
 end

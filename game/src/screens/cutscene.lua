@@ -91,7 +91,7 @@ function S:draw()
         local y = 280 - #lines * 14
         for i, s in ipairs(lines) do fonts.print(5, s, 100, y + (i - 1) * 28, "center", 600, math.max(0, math.min(1, a))) end
     end
-    fonts.print(2, "Press any key to skip", 0, 570, "center", 800, 0.5)
+    fonts.print(2, require("src.game.l10n").own("Press any key to skip"), 0, 570, "center", 800, 0.5)
     UI.finish()
 end
 

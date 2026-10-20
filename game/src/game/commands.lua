@@ -21,7 +21,8 @@
 --   { t = "quest", op = "accept"|"complete", bid, hero, answer? }   a shrine's quest (answer: the typed text of a kind 4 quest)
 --   { t = "chooseFoe", index }               the Knight's Quest dialog: candidate 1..4 becomes a chosen foe
 --   { t = "hero", id, op, a }   op: spendAttr | spendSkill | refundAttr | refundSkill (a = key), learn (a = spell),
---                               potion (a = "health" | "mana"), equip | unequip | drop | dropEquipped (a = pack index / slot)
+--                               potion (a = "health" | "mana"), equip | unequip | drop | dropEquipped (a = pack index / slot),
+--                               chestTake (chest = id, a = chest index) | chestPut | chestPutWorn (chest = id, a = pack index / slot)
 -- `side` is added by the issuer; units and buildings of other sides are ignored.
 
 -- A player command (see the list above): plain data, the same on every peer of a network game. One class for all kinds;
@@ -58,6 +59,7 @@
 ---@field attitude string?          attitude / guard
 ---@field op string?                hero / quest: the operation
 ---@field a any                     hero: the operation's argument
+---@field chest integer?            hero chestTake / chestPut: the item chest
 ---@field spell integer?            cast
 ---@field hero integer?             quest: the hero's unit id
 ---@field answer string?            quest: a typed answer
@@ -289,6 +291,16 @@ function M.apply(world, cmd)
         elseif op == "drop" or op == "dropEquipped" then
             local item = op == "drop" and h:drop(a) or h:dropEquipped(a)
             if item then world:dropItem(u.gx, u.gy, item, 4, u) end
+        elseif op == "chestTake" or op == "chestPut" or op == "chestPutWorn" then
+            local chest = world:chestNear(u, cmd.chest)
+            if not chest then return end
+            if op == "chestTake" then
+                local item = chest.items[a]
+                if item and h:stow(item) then table.remove(chest.items, a) end
+            elseif #chest.items < 4 then          -- a chest holds four items (own limit for what is put in)
+                local item = op == "chestPut" and h:drop(a) or h:dropEquipped(a)
+                if item then chest.items[#chest.items + 1] = item end
+            end
         end
     elseif t == "cast" then
         local hero = unit(world, cmd.id, side)

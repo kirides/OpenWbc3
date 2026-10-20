@@ -47,6 +47,8 @@ local M = {}
 ---@class Chest: Entity
 ---@field kind "chest"
 ---@field item table?               the item record (items.lua)
+---@field items table[]?            a scenario chest: up to four item records, taken and put back in the chest dialog
+---@field shownTo Unit?             the hero the chest dialog was opened for (not again before it has moved off)
 ---@field resource string?          a resource chest: what it holds ...
 ---@field amount integer?           ... and how much
 ---@field ignoreFor Unit?           a thrown-away item is not picked up by its owner before it has moved off
@@ -625,6 +627,35 @@ function World:dropItem(gx, gy, item, dir, thrownBy, victimDrop)
     return c
 end
 
+-- A scenario chest with several items (src/game/chests.lua): a hero next to it opens the chest dialog (screens/chest.lua),
+-- where it takes items or puts some of its own in.
+---@param gx integer
+---@param gy integer
+---@param list table[] the item records
+---@param dir integer?
+---@return Chest
+function World:dropChest(gx, gy, list, dir)
+    local c = {
+        kind = "chest", id = self:newId(), items = list, set = anims.get("IMAP"),
+        gx = gx, gy = gy, x = gx * CW + 16, y = gy * CH + 12, dir = math.max(0, math.min(4, dir or 0)),
+    }
+    self.chests[#self.chests + 1] = c
+    return c
+end
+
+-- The item chest with `id` if the hero stands next to it (a hero command may only touch the chest it stands by).
+---@param unit Unit
+---@param id integer
+---@return Chest? chest
+---@return integer? index         its place in world.chests
+function World:chestNear(unit, id)
+    for i, c in ipairs(self.chests) do
+        if c.id == id and c.items and math.max(math.abs(c.gx - unit.gx), math.abs(c.gy - unit.gy)) <= 1 then
+            return c, i
+        end
+    end
+end
+
 -- A chest of a scenario that holds resources (ITMH, src/game/chests.lua): 500 of `kind`, taken when a hero comes next to it.
 ---@param gx integer
 ---@param gy integer
@@ -653,6 +684,20 @@ function World:collectItems(unit)
             local side = self.sides[unit.side]
             if side then side[c.resource] = (side[c.resource] or 0) + c.amount end
             self:event("resourcefound", unit, c.resource, c.amount)
+        elseif near and c.items then
+            if self.sides[unit.side] and self.sides[unit.side].ai then
+                -- a computer hero takes what fits
+                for k = #c.items, 1, -1 do
+                    if unit.h:give(c.items[k]) then table.remove(c.items, k) end
+                end
+                if #c.items == 0 then table.remove(self.chests, i) end
+            elseif c.shownTo ~= unit then
+                c.shownTo = unit
+                self:event("chestopen", unit, c)
+            end
+        elseif not near and c.shownTo == unit then
+            c.shownTo = nil
+            if #c.items == 0 then table.remove(self.chests, i) end    -- an emptied chest stays while the hero is by it
         elseif near and c.ignoreFor ~= unit then
             local ok, where = unit.h:give(c.item)
             if ok then

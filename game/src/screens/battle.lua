@@ -14,6 +14,7 @@ local keymap = require("src.ui.keymap")
 local unitMod = require("src.game.unit")
 local speech = require("src.audio.speech")
 local walls = require("src.game.walls")
+local l10n = require("src.game.l10n")
 
 local A = sprite.ANIM
 local CW, CH = 32, 24
@@ -587,7 +588,7 @@ function S:unitHit(u, attacker, dmg)
         end
     elseif dmg > 1 and attacker and attacker.side ~= self.world.player then
         played = self:systemSpeech(SYSTEM.troopsUnderAttack)
-        if played then self:notify("Your forces are under attack!", 3) end
+        if played then self:notify(l10n.own("Your forces are under attack!"), 3) end
     end
     if played then self:logSite(u.x, u.y) end
 end
@@ -725,7 +726,7 @@ function S:onEvent(kind, a, b, c, d)
         -- a hero's is its conversion line
         if b and b.side == me then voices.say(b, b.hero and "Conversion" or "Build") end
     elseif kind == "upgraded" and a.side == me then
-        self:notify(("Upgraded to %s"):format(a.name or a.code))
+        self:notify(l10n.own("Upgraded to %s"):format(a.name or a.code))
         if self:systemSpeech(SYSTEM.upgradeComplete) then self:logSiteOf(a) end
     elseif kind == "converted" then
         if a.side == me then
@@ -748,7 +749,7 @@ function S:onEvent(kind, a, b, c, d)
         end
     elseif kind == "levelup" and a.side == me then
         sound.play("Assets/SoundFX.xcr", "HeroLevelUp.wav")
-        self:notify(("%s reached level %d - click the portrait to spend points, K for spells"):format(a.name or "Hero", a.h.level), 8)
+        self:notify(l10n.own("%s reached level %d - click the portrait to spend points, K for spells"):format(a.name or "Hero", a.h.level), 8)
         self:logSiteOf(a)
     elseif kind == "gainedlevel" and a.side == me then
         -- a troop gained a level: the original plays GainedLevel.wav next to it (one sound per 500 ms)
@@ -756,17 +757,20 @@ function S:onEvent(kind, a, b, c, d)
         sound.playAt("Assets/SoundFX.xcr", "GainedLevel.wav", a.gx, a.gy, { cooldown = 0.5 })
     elseif kind == "itemfound" and a.side == me then
         sound.play("Assets/SoundFX.xcr", "Statpop.wav")
-        self:notify(("Found %s"):format(b.name), 6)
+        self:notify(l10n.own("Found %s"):format(b.name), 6)
         self:logSiteOf(a)
     elseif kind == "resourcefound" and a.side == me then
         sound.play("Assets/SoundFX.xcr", "goodselect.wav")
-        self:notify(("Found %d %s"):format(c, b), 6)
+        self:notify(l10n.own("Found %d %s"):format(c, b), 6)
         self:logSiteOf(a)
+    elseif kind == "chestopen" and a.side == me then
+        sound.play("Assets/SoundFX.xcr", "Statpop.wav")
+        screens.push(require("src.screens.chest"), self, a, b)
     elseif kind == "packfull" and a.side == me then
-        self:notify("Your backpack is full", 4)
+        self:notify(l10n.game("0732", "Your backpack is full."), 4)
         self:logSiteOf(a)
     elseif kind == "itemdropped" and a.dropped then
-        self:notify("Treasure!", 3)
+        self:notify(l10n.own("Treasure!"), 3)
         self:logSiteOf(a)
     elseif kind == "herodied" then
         -- "hero fallen" for the local hero (FUN_005210b0), another side's hero "allied hero destroyed" / "enemy hero destroyed"
@@ -777,7 +781,7 @@ function S:onEvent(kind, a, b, c, d)
         end
         if a.side == me then
             self:systemSpeech(SYSTEM.heroFallen)
-            self:notify("Your hero has fallen", 8)
+            self:notify(l10n.game("0033", "Your hero is dead!"), 8)
             self:logSiteOf(a)
             -- Ironman heroes die for good: the hero and its campaign are deleted
             local profile = require("src.game.profile")
@@ -785,7 +789,7 @@ function S:onEvent(kind, a, b, c, d)
             if rec and rec.mode == 1 and not self.ironmanDeleted then
                 self.ironmanDeleted = true
                 profile.deleteIronman(rec)          -- also puts it on the deleted Ironman list
-                self:notify("Ironman hero lost - the hero is gone", 8)
+                self:notify(l10n.own("Ironman hero lost - the hero is gone"), 8)
             end
         end
     elseif kind == "converting" and a.side == me then
@@ -874,7 +878,7 @@ function S:onEvent(kind, a, b, c, d)
         sound.playAt("Assets/SoundFX.xcr", ("Falling%d.wav"):format(math.random(0, 1)), a.gx, a.gy)
     elseif kind == "defeated" then
         if a == me then
-            self:notify("You have been defeated", 8)
+            self:notify(l10n.own("You have been defeated"), 8)
         else
             self:notify(("%s have been vanquished"):format(gamedata.RACES[world.sides[a].race] or "?"), 6)
             -- the side-defeated message (0x21c, FUN_004af270): "enemy vanquished" for a side not allied to the local
@@ -930,7 +934,7 @@ function S:updateNet(dt)
         function(side)
             world.sides[side].ai = true
             if world.ai then world.ai:adopt(side) end
-            self:notify(("%s left the game"):format(self.net.names[side] or ("Player " .. (side + 1))), 6)
+            self:notify(l10n.game("0237", "%s has left the game..."):format(self.net.names[side] or ("Player " .. (side + 1))), 6)
         end)
     if self.net.desync and not self.desyncShown then
         self.desyncShown = true
@@ -1111,6 +1115,16 @@ end
 function S:heroOp(op, a)
     local hero = self.world.eco:heroAlive(self.world.player)
     if hero then self:issue({ t = "hero", id = hero.id, op = op, a = a }) end
+end
+
+-- Keeps the battle running under a dialog that does not pause it (the chest dialog); a network game already runs
+-- through `underUpdate`.
+---@param dt number
+function S:runBackground(dt)
+    if self.net or self.paused or self.result then return end
+    self.world:update(dt)
+    self.fog:update(self.world.time)
+    self.fx:update(dt)
 end
 
 -- Sends a command (executed at once, or at the agreed tick in a network game).
@@ -1440,7 +1454,7 @@ function S:mapClick(x, y, button)
                 if why == "recovering" and self.fx then self.fx:recovering(hero) end      -- "recovering" over the hero
             end
         else
-            self:notify("Invalid target", 2)
+            self:notify(l10n.own("Invalid target"), 2)
         end
         return
     end
@@ -1728,7 +1742,7 @@ function S:nextIdleBuilder()
     for _, u in ipairs(self:myUnits()) do
         if u.state == "idle" and self.hud:isBuilder(u) and not u.hero then list[#list + 1] = u end
     end
-    if #list == 0 then self:notify("No idle builders", 2) return end
+    if #list == 0 then self:notify(l10n.own("No idle builders"), 2) return end
     local at = 0
     for i, u in ipairs(list) do if self.selection[1] == u then at = i end end
     local u = list[at % #list + 1]
@@ -2615,7 +2629,7 @@ function S:draw()
     if self.paused then
         g.push()
         g.scale(self.hud.s)
-        fonts.print(1, "Paused", 0, 200, "center", W / self.hud.s)
+        fonts.print(1, l10n.game("0088", "Game Paused"), 0, 200, "center", W / self.hud.s)
         g.pop()
     end
     if self.result then self:drawResult() end
@@ -2840,8 +2854,8 @@ function S:drawResult()
     g.push()
     g.scale(self.hud.s)
     local w = W / self.hud.s
-    fonts.print(1, self.result.won and "Victory!" or "Defeat", 0, 220, "center", w)
-    fonts.print(5, "Click to return", 0, 270, "center", w)
+    fonts.print(1, self.result.won and l10n.game("0728", "Victory") or l10n.game("0729", "Defeat"), 0, 220, "center", w)
+    fonts.print(5, l10n.game("0730", "Click to leave") .. " " .. l10n.game("0731", "battle..."), 0, 270, "center", w)
     g.pop()
 end
 

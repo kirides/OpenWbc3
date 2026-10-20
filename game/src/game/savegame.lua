@@ -298,7 +298,12 @@ function M.snapshot(battle)
     end
     for _, b in ipairs(world.buildings) do data.buildings[#data.buildings + 1] = buildingRecord(world, b, t) end
     for _, c in ipairs(world.chests) do
-        data.chests[#data.chests + 1] = { id = c.item and c.item.id, resource = c.resource, gx = c.gx, gy = c.gy, dir = c.dir }
+        local ids
+        if c.items then
+            ids = {}
+            for k, it in ipairs(c.items) do ids[k] = it.id end
+        end
+        data.chests[#data.chests + 1] = { id = c.item and c.item.id, ids = ids, resource = c.resource, gx = c.gx, gy = c.gy, dir = c.dir }
     end
     local ev = world.events
     data.events = { flags = ev.flags, flagMask = ev.flagMask, counters = ev.counters, stats = ev.stats, state = {} }
@@ -510,6 +515,10 @@ function M.apply(battle, data)
     local items = require("src.game.items")
     for _, c in ipairs(data.chests) do
         if c.resource then world:dropResource(c.gx, c.gy, c.resource, c.dir)
+        elseif c.ids then
+            local list = {}
+            for _, id in ipairs(c.ids) do list[#list + 1] = items.get(id) end
+            world:dropChest(c.gx, c.gy, list, c.dir)
         else world:dropItem(c.gx, c.gy, items.get(c.id), c.dir) end
     end
     if data.events then

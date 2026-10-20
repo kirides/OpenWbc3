@@ -8,6 +8,7 @@ local profile = require("src.game.profile")
 local heroMod = require("src.game.hero")
 local items = require("src.game.items")
 local log = require("src.core.log")
+local l10n = require("src.game.l10n")
 
 local M = {}
 
@@ -289,17 +290,17 @@ local function giveRewards(state, act, lines)
         if r.type == "crowns" then
             local n = tonumber(r.data) or 0
             state.crowns = state.crowns + n
-            lines[#lines + 1] = r.short or (n .. " Crowns")
+            lines[#lines + 1] = r.short or l10n.xci(313, 2, "%d Crowns"):format(n)
         elseif r.type == "xp" then
             local n = tonumber(r.data) or 0
             addXp(state, n)
-            lines[#lines + 1] = r.short or (n .. " XP")
+            lines[#lines + 1] = r.short or l10n.xci(330, 1, "XP: %d"):format(n)
         elseif r.type == "bonus" then
             local index = tonumber(r.data)
             ---@cast index -nil
             state.bonuses[index] = true
             local b = data.load().bonuses[index]
-            lines[#lines + 1] = b and b.name or r.short or "A bonus"
+            lines[#lines + 1] = b and b.name or r.short or l10n.xci(326, 1, "Bonus")
         elseif r.type == "item" then
             local it = items.get(tonumber(r.data))
             if it then
@@ -551,19 +552,21 @@ end
 function M.completeCampaign(state)
     local lines = {}
     state.crowns = state.crowns + 1000
-    lines[#lines + 1] = "1000 Crowns"
+    lines[#lines + 1] = l10n.xci(313, 2, "%d Crowns"):format(1000)
     local it = items.random(3)
     if it then
         state.stash[#state.stash + 1] = it.id
         lines[#lines + 1] = it.name
     end
+    local DRAGON = "AADR"
     local rec = M.heroRecord(state)
     if rec then
         local retinue = require("src.game.retinue")
-        retinue.give(rec, retinue.fresh("AADR", 5, "Dragon"), retinue.slotsOf(rec))
+        retinue.give(rec, retinue.fresh(DRAGON, 5, "Dragon"), retinue.slotsOf(rec))
         profile.update(rec)
     end
-    lines[#lines + 1] = "Dragon (level 5)"
+    local dragon = require("src.game.gamedata").army(DRAGON)
+    lines[#lines + 1] = l10n.game("0722", "Level %d %s"):format(5, dragon and dragon.name or "Dragon")
     state.finished = true
     state:save()
     return lines

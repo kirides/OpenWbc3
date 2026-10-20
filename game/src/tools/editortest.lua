@@ -182,8 +182,10 @@ function M.run(check)
     local gold0 = w.sides[0].crystal or 0
     local resChest
     for _, c in ipairs(w.chests) do if c.resource then resChest = c end end
-    check("editor battle: the chests are on the map (3 items, a resource chest, the random ones)",
-        resChest and resChest.resource == "crystal" and nchest == before + 1 + 3 + 1)
+    local itemChest
+    for _, c in ipairs(w.chests) do if c.items and #c.items == 3 then itemChest = c end end
+    check("editor battle: the chests are on the map (one chest of 3 items, a resource chest, the random one)",
+        resChest and resChest.resource == "crystal" and itemChest and nchest == before + 1 + 1 + 1)
     local picker = { gx = 24, gy = 20, side = 0 }       -- a hero stand-in: collectItems reads its cell and side
     ---@cast picker Unit
     w:collectItems(picker)

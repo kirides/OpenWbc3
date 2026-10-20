@@ -239,10 +239,10 @@ function M.powerLines(it)
             line = p.text
         elseif p.type == "cast spell" then
             local name = strings.get("Spells.txt", ("SPELL_NAME_%02d"):format(p.data))
-            line = name and ("Casts " .. name) or nil
+            line = name and (strings.get("Game.txt", "0454") or "Casts %s"):format(name) or nil
             if line and p.chance then line = line .. (" (%d%%)"):format(p.chance) end
         elseif p.type == "spell failure" then
-            line = ("%+d%% Spell Failure"):format(p.data)
+            line = require("src.game.l10n").own("%+d%% Spell Failure"):format(p.data)
         elseif content.itempower._recs[p.type] and content.itempower._recs[p.type].text then
             local tpl = strings.get("Game.txt", content.itempower._recs[p.type].text)
             line = tpl and format(tpl, p.data) or nil

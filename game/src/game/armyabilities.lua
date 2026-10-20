@@ -30,6 +30,7 @@ local rules = require("src.game.rules")
 local gamedata = require("src.game.gamedata")
 local strings = require("src.game.strings")
 local status = require("src.game.status")
+local l10n = require("src.game.l10n")
 
 local M = {}
 
@@ -164,8 +165,8 @@ function M.buttons(world, side, units, taken)
         sacrifice()
         fanaticism()
         if count <= 1 then
-            add({ id = "rotateLeft", icon = ICON.rotateLeft, tip = "Rotate formation" })
-            add({ id = "rotateRight", icon = ICON.rotateRight, tip = "Rotate formation" })
+            add({ id = "rotateLeft", icon = ICON.rotateLeft, tip = l10n.game("0020", "Rotate Formation Anti-Clockwise") })
+            add({ id = "rotateRight", icon = ICON.rotateRight, tip = l10n.game("0019", "Rotate Formation Clockwise") })
         end
         return out
     end

@@ -2146,8 +2146,10 @@ their details were not re-checked in the 1.04 binary. The scenario formats are i
   item of `Items.xml`, never a mod item, whose "modid:name" does not fit the record's i16 item number; the original's list shows 16 hard-coded names but `FUN_004c8980` returns a random item) / Random / Resource (gold, metal, stone,
   crystal), modes New / Edit / Delete; a click puts a chest on the cell or, if there is one, adds a numbered item to it (never a random item, at most
   four, never to a resource chest, as `FUN_004c3f90`); Edit opens `PNL_EDITOR_ITEMS_CHEST` ("Item One" .. "Four", greyed beyond the count) and
-  `_CHEST_VIEW` (Random item / Resource / the item's name and powers, Remove - not for the last item). In a battle every item of a chest becomes an item
-  on that cell (the original opens a dialog to take one), a random item is the tier-2 roll chests always used here, a resource chest gives 500 of its
+  `_CHEST_VIEW` (Random item / Resource / the item's name and powers, Remove - not for the last item). In a battle an item chest is one object holding its items; a hero next to it
+  opens the chest dialog (`screens/chest.lua`: worn items, backpack and chest, a click moves an item over, at most four in the chest; hero
+  commands `chestTake` / `chestPut` / `chestPutWorn`) while the battle runs on; a computer hero takes what fits. The dialog's frame and layout are
+  openwbc3's own, observed behaviour only (not traced in the binary yet; the Ghidra backend was not available). A random item is the tier-2 roll chests always used here, a resource chest gives 500 of its
   resource to the side of the hero that comes next to it (the chest pick-up `FUN_0053a1a0`; saved with the game; `World:dropResource`). Not
   reproduced: the original's resource chest in the editor cannot be placed (`FUN_004c8980` leaves the item index at -1 and `FUN_004c3f90` then breaks).
 - Message boxes (`PNL_EDITPANEL_MB` / `_MB_QUESTION`, the original's `FUN_004bf5a0`, `S:messageBox` in `editor.lua`): the panel sits at (290, 448) over the

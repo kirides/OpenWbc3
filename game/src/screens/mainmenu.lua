@@ -3,6 +3,7 @@ local screens = require("src.core.screens")
 local UI = require("src.ui.interface")
 local music = require("src.audio.music")
 local fonts = require("src.ui.fonts")
+local l10n = require("src.game.l10n")
 
 ---@class MainMenuScreen: Screen
 ---@field panel Panel                PNL_MAINMENU
@@ -65,7 +66,7 @@ function S:button(name)
         end)
     elseif name == "BUTT_MM_TUTORIAL" then
         if not require("src.game.tutorial").start() then
-            self.notice = { text = "Tutorial scenario not found", t = love.timer.getTime() }
+            self.notice = { text = l10n.own("Tutorial scenario not found"), t = love.timer.getTime() }
         end
     elseif name == "BUTT_MM_MULTIPLAYER" then
         screens.push(require("src.screens.heroselect"), function(hero)
@@ -78,7 +79,7 @@ function S:button(name)
     elseif name == "BUTT_MM_QUIT" then
         love.event.quit()
     else
-        self.notice = { text = "Not implemented yet", t = love.timer.getTime() }
+        self.notice = { text = l10n.own("Not implemented yet"), t = love.timer.getTime() }
     end
 end
 
