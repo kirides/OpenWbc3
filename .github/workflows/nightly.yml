@@ -1,0 +1,107 @@
+# Nightly release: fuses the game (game/) with the newest LÖVE 12 build from love2d/love's main branch
+# (https://www.love2d.org/wiki/Game_Distribution): Windows x64 (love.exe + game.love), Linux x64 (AppImage + game.love)
+# and the plain .love file. The original game's data is not part of any package; players point the game at their install.
+name: nightly
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Release even if nothing changed since the last nightly"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+env:
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  nightly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Skip when nothing changed
+        id: check
+        run: |
+          last=$(gh release view nightly --json body --jq .body 2>/dev/null | sed -n 's/^openwbc3 commit: //p' | head -n1 || true)
+          if [ "$last" = "$GITHUB_SHA" ] && [ "${{ inputs.force }}" != "true" ]; then
+            echo "Nightly already built from $GITHUB_SHA"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Package game.love
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          mkdir -p dist
+          (cd game && zip -9 -r -q ../dist/openwbc3.love . -x 'converted/*' -x '*.ini')
+          unzip -l dist/openwbc3.love | tail -n1
+
+      - name: Fetch the newest LÖVE 12 build
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          run_id=$(gh run list -R love2d/love -b main -w continuous-integration -s success -L 1 \
+            --json databaseId,headSha --jq '.[0].databaseId')
+          love_sha=$(gh run view "$run_id" -R love2d/love --json headSha --jq .headSha)
+          echo "LOVE_SHA=$love_sha" >> "$GITHUB_ENV"
+          mkdir -p love
+          gh run download "$run_id" -R love2d/love -n love-windows-x64 -n love-linux-X64.AppImage -D love
+          find love -type f
+
+      - name: Fuse Windows build
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          unzip -q love/love-windows-x64/love-*-win64.zip -d win
+          d=$(echo win/love-*-win64)
+          out=dist/openwbc3-windows-x64
+          mkdir -p "$out"
+          cp "$d"/*.dll "$out"/
+          cp "$d/license.txt" "$out/love-license.txt"
+          cat "$d/love.exe" dist/openwbc3.love > "$out/openwbc3.exe"
+          cp LICENSE README.md "$out"/
+          (cd dist && zip -9 -r -q openwbc3-windows-x64.zip openwbc3-windows-x64)
+          rm -r "$out"
+
+      - name: Fuse Linux build
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          # Official AppImage is relocatable (11.4+): extract, fuse bin/love, repoint AppRun/desktop file, repack.
+          src=$(echo love/love-linux-X64.AppImage/*.AppImage)
+          chmod +x "$src"
+          (mkdir appimg && cd appimg && "../$src" --appimage-extract >/dev/null)
+          root=appimg/squashfs-root
+          cat "$root/bin/love" dist/openwbc3.love > "$root/bin/openwbc3"
+          chmod +x "$root/bin/openwbc3"
+          rm "$root/bin/love"
+          sed -i 's#bin/love#bin/openwbc3#g' "$root/AppRun"
+          grep -q 'bin/openwbc3' "$root/AppRun" || { echo "AppRun does not start bin/love"; cat "$root/AppRun"; exit 1; }
+          sed -i 's#^Exec=love#Exec=openwbc3#; s#^Name=.*#Name=openwbc3#' "$root"/*.desktop
+          curl -fsSL -o appimagetool \
+            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool
+          ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 ./appimagetool "$root" dist/openwbc3-linux-x86_64.AppImage
+
+      - name: Publish release
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          cat > notes.md <<EOF
+          Automated nightly build of the latest \`main\`. Needs your own Warlords Battlecry III (GOG) install; see the README.
+
+          openwbc3 commit: $GITHUB_SHA
+          LÖVE 12 build: love2d/love@$LOVE_SHA
+
+          - \`openwbc3-windows-x64.zip\`: unzip and run \`openwbc3.exe\`
+          - \`openwbc3-linux-x86_64.AppImage\`: \`chmod +x\` and run
+          - \`openwbc3.love\`: for any other platform with a LÖVE 12 build (\`love openwbc3.love\`)
+          EOF
+          gh release delete nightly --cleanup-tag --yes 2>/dev/null || true
+          gh release create nightly dist/openwbc3.love dist/openwbc3-windows-x64.zip dist/openwbc3-linux-x86_64.AppImage \
+            --target "$GITHUB_SHA" --prerelease --title "Nightly $(date -u +%F)" --notes-file notes.md
