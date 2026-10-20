@@ -967,8 +967,16 @@ end
 -- The evaluator ----------------------------------------------------------------------------------------------------
 
 -- Does the unit carry out an order of the player (or of a rule that overrides the player): any order that is not one of
--- its own attitude's (autoChase / roaming), a task, a conversion or a flight.
+-- its own attitude's (autoChase / roaming), a task, a conversion or a flight. An attack-move is not one: the
+-- Attack button on open ground sends the group move without "ignore threats" (the right-click map action 0x00421190,
+-- command mode 2 without a target: actions 0x1a / 0x37 / 0x38 / 0x39 / 0x3a / 0x3b, FUN_0041f0b0 -> FUN_00530870 with
+-- the last argument 0), so every move order (FUN_0051d6b0) gets the override level 1 at +0x1c, which the system orders
+-- of the rules (FUN_0051da60 / FUN_0051d6b0 with the system flag) insert themselves ahead of; a plain move has level 0,
+-- which they refuse. The second result: the unit is busy all the same (FUN_005070f0 gives the idle action only to an
+-- army without an order or one carrying out a system order: the attitude's own chase / walk).
+---@return boolean mine, boolean? busy
 local function playerOrder(unit)
+    if unit.attackMove and not unit.task and not unit.converting then return false, not (unit.autoChase or unit.roaming) end
     if unit.task or unit.converting or unit.patrol or unit.running and unit.goalX then return true end
     if unit.queue and #unit.queue > 0 then return true end
     if unit.target or unit.goalX then return not (unit.autoChase or unit.roaming) end
@@ -991,10 +999,12 @@ function M.think(unit, t)
         def = M.def[M.DEFAULT]
     end
     local idle = unit.state == "idle"
-    if idle and not unit.autoChase and not unit.roaming then unit.post = { unit.gx, unit.gy } end
+    -- the guard point; on an attack-move the spot where a fight begins (FUN_0051da60 keeps the army's position as the
+    -- fight's return point)
+    if (idle or unit.attackMove) and not unit.autoChase and not unit.roaming then unit.post = { unit.gx, unit.gy } end
     if def.spells and unit.h then require("src.game.spells").aiThink(unit, t) end
 
-    local mine = playerOrder(unit)
+    local mine, busy = playerOrder(unit)
     local best
     for _, r in ipairs(def.ai.rules) do
         -- every rule is looked at, also below the best one found (the conditions have side effects: the "has been hit" flag)
@@ -1005,7 +1015,7 @@ function M.think(unit, t)
     local action, from = nil, best
     if best then
         action = best.action
-    elseif mine then
+    elseif mine or busy then
         return false                                    -- never the idle action while the player gives orders
     elseif def.ai.idle then
         action = def.ai.idle

@@ -1327,16 +1327,20 @@ function S:command(wx, wy, mode)
             return
         end
     end
-    self:marchInFormation(units, gx, gy, queue, interrupt)
-    self:sparkle(wx, wy, "cyan")
+    -- the Attack button on open ground is an attack-move: the group move without "ignore threats" (right-click map
+    -- action 0x00421190, command mode 2 without a target -> FUN_00530870 with the last argument 0), a move the units'
+    -- attitudes may divert into fights on the way (attitude.lua, playerOrder)
+    local attack = mode == "attack" or nil
+    self:marchInFormation(units, gx, gy, queue, interrupt, nil, attack)
+    self:sparkle(wx, wy, attack and "red" or "cyan")
 end
 
 -- March in formation: slots around the cell (gx, gy), at the pace of the slowest unit unless `noPace`. The formation is
 -- the group leader's (formation.leader): its type and direction. A target 5 or more cells from the centre of the group
 -- turns the formation (formation.directionFor) and hands the leader's type and the new direction to every unit of the
 -- group, as the original's group move (FUN_00530870) does; the rotate keys and the formation buttons call this with
--- the leader's own cell, so that this check applies to them too.
-function S:marchInFormation(units, gx, gy, queue, interrupt, noPace)
+-- the leader's own cell, so that this check applies to them too. `attack`: an attack-move.
+function S:marchInFormation(units, gx, gy, queue, interrupt, noPace, attack)
     local world = self.world
     local formation = require("src.game.formation")
     local n = #units
@@ -1363,7 +1367,8 @@ function S:marchInFormation(units, gx, gy, queue, interrupt, noPace)
         if tx then moves[#moves + 1] = { u.id, tx, ty } end
     end
     if #moves > 0 then
-        self:issue({ t = "move", moves = moves, pace = n > 1 and pace ~= math.huge and pace or nil, queue = queue, interrupt = interrupt })
+        self:issue({ t = "move", moves = moves, pace = n > 1 and pace ~= math.huge and pace or nil, queue = queue, interrupt = interrupt,
+                      attack = attack })
     end
 end
 

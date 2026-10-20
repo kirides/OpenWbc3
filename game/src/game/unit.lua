@@ -55,6 +55,7 @@ local XP_FOR_LEVEL = { 0, 5, 10, 20, 40, 70, 110, 160, 220, 280, 350, 430, 520, 
 ---@field x integer?                move
 ---@field y integer?
 ---@field pace number?              move / attack: the formation's pace
+---@field attack boolean?          move: an attack-move
 ---@field target (Unit|Building)?   attack
 ---@field auto boolean?             attack: an attitude's own attack
 ---@field task UnitTask?            task
@@ -126,6 +127,7 @@ local XP_FOR_LEVEL = { 0, 5, 10, 20, 40, 70, 110, 160, 220, 280, 350, 430, 520, 
 ---@field queue UnitOrder[]?
 ---@field patrol {points: {[1]: integer, [2]: integer}[], index: integer, heading: boolean?}?
 ---@field guarding Unit?
+---@field attackMove {x: integer, y: integer, pace: number?}? the goal of an attack-move: a move the attitude may divert
 ---@field animStart number?
 ---@field animDur number?
 ---@field animLoop boolean?
@@ -576,7 +578,7 @@ end
 function Unit:stop()
     self.task = nil
     self.target, self.path, self.goalX = nil, nil, nil
-    self.queue, self.patrol, self.guarding, self.roaming = nil, nil, nil, nil
+    self.queue, self.patrol, self.guarding, self.roaming, self.attackMove = nil, nil, nil, nil, nil
     if self.state ~= "step" and self.state ~= "dead" then self:setIdle(self.world.time) end
 end
 
@@ -599,9 +601,11 @@ end
 
 ---@param o UnitOrder
 function Unit:runOrder(o)
+    self.attackMove = nil
     if o.kind == "move" then
         self:orderMove(o.x, o.y)
         self.pace = o.pace
+        if o.attack then self.attackMove = { x = o.x, y = o.y, pace = o.pace } end
     elseif o.kind == "attack" then
         if o.target and ((o.target.kind == "unit" and o.target:alive()) or (o.target.kind == "building" and o.target.hp > 0)) then
             self:orderAttack(o.target, o.auto)
@@ -624,7 +628,9 @@ end
 -- savegame.lua saveOrders: task first, then an attack target, then a move goal.
 ---@return UnitOrder?
 function Unit:currentOrder()
+    local am = self.attackMove
     if self.task then return { kind = "task", task = self.task }
+    elseif am then return { kind = "move", x = am.x, y = am.y, pace = am.pace, attack = true }
     elseif self.target then return { kind = "attack", target = self.target, auto = self.autoChase or nil, pace = self.pace }
     elseif self.goalX then return { kind = "move", x = self.goalX, y = self.goalY, pace = self.pace } end
 end
@@ -651,6 +657,7 @@ function Unit:insertOrder(order)
     -- skip when the new order repeats the one being carried out (the insert branch's already-done check)
     if running and running.kind == order.kind and running.kind ~= "task" then
         local same = running.kind == "move" and running.x == order.x and running.y == order.y
+                and not running.attack == not order.attack
             or (running.kind == "attack" and running.target == order.target)
         if same then return end
     end
@@ -665,7 +672,7 @@ end
 ---@param keepQueue boolean?
 function Unit:clearOrders(keepQueue)
     if not keepQueue then self.queue, self.patrol = nil, nil end
-    self.guarding, self.roaming = nil, nil
+    self.guarding, self.roaming, self.attackMove = nil, nil, nil
 end
 
 -- Shift+Esc: drops the last queued order; End: all but the running one.
@@ -1746,6 +1753,9 @@ function Unit:update(t)
             if e then self:orderAttack(e) return end
         end
         if self:advance(t, self.goalX, self.goalY, 0) then
+            -- an attack-move ends where it was sent (not at the end of a way back of the unit's attitude)
+            local am = self.attackMove
+            if am and am.x == self.goalX and am.y == self.goalY then self.attackMove = nil end
             self.goalX, self.goalY = nil, nil
             self.path = nil
             if self.state ~= "step" then self:setIdle(t) end
@@ -1803,8 +1813,15 @@ function Unit:update(t)
         return
     end
 
-    -- idle: queued orders first, then patrol / guard duty
+    -- idle: an attack-move that the attitude stopped for a fight goes on (the fight was inserted ahead of the move,
+    -- FUN_0051da60), then queued orders, then patrol / guard duty
     if self.state == "idle" then
+        local am = self.attackMove
+        if am then
+            self:orderMove(am.x, am.y)
+            self.pace = am.pace
+            return
+        end
         if self.queue and #self.queue > 0 then
             self:runOrder(table.remove(self.queue, 1))
             return

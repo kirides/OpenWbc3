@@ -532,6 +532,34 @@ function M.run(check)
     w.sides[0].powerups = nil
     ht.hp = 0
 
+    -- Attack-move (the Attack button on open ground): the unit's attitude (the start attitude, Defensive) fights the enemy
+    -- it meets on the way and the move goes on to the clicked spot afterwards; a plain move is not diverted (an open
+    -- stretch of the map)
+    local ax, ay = 18, 14
+    local function attackMove(attack)
+        local aw = worldMod.new(assert(boot.loadScenario("Bridges")), { player = 0 })
+        for _, o in ipairs(aw.units) do
+            o.state, o.hp, o.deadSince = "dead", 0, -1e9
+            aw.occ[aw:index(o.gx, o.gy)] = nil
+        end
+        local m = assert(aw:addUnit("AHKX", 0, ax, ay))
+        local foe = assert(aw:addUnit("AHKX", 1, ax + 5, ay + 2))
+        foe.attitude = "standGround"
+        foe.hp = 1
+        require("src.game.commands").apply(aw, { t = "move", side = 0, moves = { { m.id, ax + 12, ay } }, attack = attack })
+        local fought = false
+        for _ = 1, 30 * 30 do
+            aw:update(1 / 30)
+            if m.target == foe then fought = true end
+        end
+        return m, foe, fought
+    end
+    local am, amFoe, amFought = attackMove(true)
+    check("attack-move: attacks the enemy met on the way", amFought and not amFoe:alive())
+    check("attack-move: then goes on to the clicked spot", am.gx == ax + 12 and am.gy == ay and am.attackMove == nil)
+    local _, _, mvFought = attackMove(nil)
+    check("attack-move: a plain move walks past", not mvFought)
+
     -- A Passive side (level 0) is a computer side (DAT_0070d6a4, an AI object from FUN_00504a30) whose turn only runs
     -- the attitude pass FUN_00532530 before FUN_004fa120 returns: a controller without a production model, its units
     -- evaluated on its round-robin turn without the human sides' fog, and the computer spells / ability sweep skipped.

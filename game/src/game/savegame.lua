@@ -178,7 +178,7 @@ local function dec(v, ulist, blist)
     return out
 end
 
--- The order a unit is carrying out, its waiting queue, patrol and guard duty.
+-- The order a unit is carrying out, its waiting queue, attack-move, patrol and guard duty.
 local function saveOrders(u, uidx, bidx)
     local cur
     -- a target that died this tick is no order any more (the way back, if any, is saved instead)
@@ -207,6 +207,7 @@ local function saveOrders(u, uidx, bidx)
     end
     if u.patrol then r.patrol = { points = u.patrol.points, index = u.patrol.index, heading = u.patrol.heading } end
     if u.guarding and uidx[u.guarding] then r.guard = uidx[u.guarding] end
+    if u.attackMove then r.amove = { x = u.attackMove.x, y = u.attackMove.y, pace = u.attackMove.pace } end
     if u.post then r.post = u.post end
     if u.att then r.att = { action = u.att.action, extra = u.att.extra, tx = u.att.tx, ty = u.att.ty } end
     if next(r) == nil then return nil end
@@ -235,6 +236,7 @@ local function restoreOrders(u, r, ulist, blist)
             if d.kind == "move" then u.autoChase, u.roaming, u.running = d.auto or false, d.roam or nil, d.running or nil end
         end
     end
+    if r.amove then u.attackMove = { x = r.amove.x, y = r.amove.y, pace = r.amove.pace } end   -- after runOrder (clears it)
 end
 
 -- Builds the save table for a running battle screen.

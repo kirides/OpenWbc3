@@ -2,7 +2,7 @@
 -- command table that refers to units and buildings by id; `apply` carries it out. In a network
 -- game the commands are exchanged and applied by every peer at the same game tick.
 --
---   { t = "move", moves = { {id, x, y}, ... }, pace }
+--   { t = "move", moves = { {id, x, y}, ... }, pace, attack }   attack: attack-move (fight what comes near on the way)
 --   { t = "attack", ids, target = {kind, id} }
 --   { t = "task", kind = "convert"|"mine"|"garrison"|"visit", ids, bid }
 --   { t = "stop", ids }                       orders accept queue = true (Shift) / interrupt = true (Alt)
@@ -38,6 +38,7 @@
 ---@field interrupt boolean?        Alt: run first, the current order resumes afterwards
 ---@field moves {[1]: integer, [2]: integer, [3]: integer}[]? move: { unit id, x, y } each
 ---@field pace number?
+---@field attack boolean?          move: an attack-move (the Attack button on open ground)
 ---@field target any                attack: {kind, id}; guard: a unit id; cast: {gx, gy} | {unit = id} | {choice = i}
 ---@field kind string?              task: "convert" | "mine" | "garrison" | "visit"
 ---@field points {[1]: integer, [2]: integer}[]? patrol
@@ -132,7 +133,7 @@ function M.apply(world, cmd)
         for _, u in ipairs(world.units) do
             local m = byId[u.id]
             if m and u.side == side and u:alive() then
-                give(u, cmd, { kind = "move", x = m[2], y = m[3], pace = cmd.pace })
+                give(u, cmd, { kind = "move", x = m[2], y = m[3], pace = cmd.pace, attack = cmd.attack or nil })
             end
         end
     elseif t == "attack" then

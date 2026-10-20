@@ -318,7 +318,21 @@ Binary: the control panel draw `FUN_004d7710`; the building's combat value `FUN_
 resistance getter not traced in the 1.04 binary yet.
 
 ### Units, orders, AI
-Saved games keep the current order (move, attack, task), the order queue, patrol and guard duty of every unit
+Attack-move (checked in the 1.04 binary): the Attack button clicked on open ground (command mode 2 without a target in
+the right-click map action at `0x00421190`, also on the minimap) gives the map actions 0x1a / 0x37 / 0x38 (Shift: append,
+Alt: insert) or 0x39 / 0x3a / 0x3b (the other pace), which `FUN_0041f0b0` turns into the group move `FUN_00530870` with
+the last argument 0; the Move button and the plain right click (actions 4 / 0x15 / 0x18 / 0x21 .. 0x23) pass 1, "ignore
+threats". That flag becomes the override level at +0x1c of every army's move order (`FUN_0051d6b0`): 0 for a plain
+move, which the system orders of the attitude rules are refused by, 1 for the attack-move, ahead of which they insert
+themselves (`FUN_0051da60` / `FUN_0051d6b0` with the system flag: the insert `FUN_00406530`), so the move resumes when
+the fight is over. There is no enemy search of its own: what the units fight is up to their attitudes (Defensive, the
+start attitude, fights threats in its 12 cell box; Stand Ground only what is in range). The attitude evaluator
+(`FUN_005070f0`) runs every rule for every army and gives the idle action only to an army without an order or one
+carrying out a system order, so the idle action does not interrupt the walk. openwbc3: `Unit.attackMove` (a move order
+with `attack`, saved), `attitude.lua` `playerOrder`; the guard point follows the walking unit (the fight keeps the
+army's position as its return point).
+
+Saved games keep the current order (move, attack-move, attack, task), the order queue, patrol and guard duty of every unit
 (units and buildings are referenced by list index; orders that refer to something not saved are dropped; the
 `--sim saveload` test checks it); queued orders are plain data (`Unit:enqueue`).
 
