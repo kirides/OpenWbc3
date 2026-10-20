@@ -1061,13 +1061,18 @@ end
 ---@param u Unit
 ---@param tx integer
 ---@param ty integer
+---@param detourNodes integer? a detour (Unit:detour): other armies block, at most this many nodes
 ---@return {[1]: integer, [2]: integer}[] path, boolean reached
-function World:findPath(u, tx, ty)
+function World:findPath(u, tx, ty, detourNodes)
     local move = u.move
     local terrain, static, occ, w = self.terrain, self.static, self.occ, self.w
     local function passable(x, y)
         if not terrain:passable(x, y, move) then return false end
         if move ~= 1 and static[y * w + x] ~= 0 then return false end
+        if detourNodes then
+            local o = occ[y * w + x]
+            if o and o ~= u then return false end
+        end
         return true
     end
     local function cost(x, y)
@@ -1075,7 +1080,7 @@ function World:findPath(u, tx, ty)
         if o and o ~= u then return o.state == "idle" and 4 or 1 end
         return 0
     end
-    return self.finder:find(u.gx, u.gy, tx, ty, passable, 6000, cost)
+    return self.finder:find(u.gx, u.gy, tx, ty, passable, detourNodes or 6000, cost)
 end
 
 -- Entities touching a world point (for picking). A unit is picked when the point is

@@ -119,6 +119,7 @@ local XP_FOR_LEVEL = { 0, 5, 10, 20, 40, 70, 110, 160, 220, 280, 350, 430, 520, 
 ---@field pathGoalX integer?
 ---@field pathGoalY integer?
 ---@field blockedSince number?
+---@field detourAfter number? world time before which a blocked unit does not try another detour
 ---@field task UnitTask?
 ---@field converting {t0: number, t1: number}?
 ---@field hidden boolean?           inside a construction site, mine or garrison
@@ -857,6 +858,38 @@ function Unit:updateStep(t)
     return false
 end
 
+-- The waits of a blocked army: the original's wait is a counter of 5 that its tick (FUN_0051e0f0) counts down twice
+-- per 25 ms game tick, about 65 ms; after a failed detour it waits 0x14 (about 250 ms). The ms values are derived from
+-- the tick, not measured in the original.
+local DETOUR_WAIT, DETOUR_RETRY = 65, 250
+
+-- The original's local detour (FUN_004308b0): a search in which armies block, from the army to the first free waypoint
+-- of the blocked one and the eight after it (the last of them when none is free), spliced into the path. When that
+-- waypoint cannot be reached because it is the end of the path - the cell of the enemy a melee army walks at - the
+-- detour leads to the closest free cell instead, which is how a group spreads around the enemy rather than queueing
+-- behind the ones already fighting. The original caps the search at f 90 (f = g + 2 x the distance); here a node limit.
+---@return boolean found
+function Unit:detour()
+    local path = self.path
+    ---@cast path -nil
+    local world = self.world
+    local last = math.min(#path, 9)
+    local gi = last
+    for i = 2, last do
+        if world:free(path[i][1], path[i][2], self.move, self) then gi = i break end
+    end
+    local g = path[gi]
+    local dp, reached = world:findPath(self, g[1], g[2], 600)
+    if #dp == 0 or not reached and gi < #path then return false end
+    if not reached and math.max(math.abs(dp[#dp][1] - g[1]), math.abs(dp[#dp][2] - g[2]))
+        >= math.max(math.abs(self.gx - g[1]), math.abs(self.gy - g[2])) then
+        return false      -- no closer to the goal than where it stands
+    end
+    for i = gi + 1, #path do dp[#dp + 1] = path[i] end
+    self.path = dp
+    return true
+end
+
 -- Follows self.path toward (goalX, goalY); returns true when the goal is reached
 -- or unreachable.
 ---@param t number
@@ -880,9 +913,20 @@ function Unit:advance(t, goalX, goalY, stopDist)
         self:beginStep(nxt[1], nxt[2], t)
         return false
     end
-    -- blocked by another unit: wait a little, then path around it
+    -- blocked by another unit (the step routine FUN_00430340): an allied army that is walking along its own path is
+    -- waited for, up to five waits; anything else (an army standing, fighting, an enemy) at once, or the walker after
+    -- the waits, is walked around by a detour (Unit:detour). A failed detour waits before the next try; after 400 ms
+    -- the whole path is planned again
     local other = world:unitAt(nxt[1], nxt[2])
     self.blockedSince = self.blockedSince or t
+    local walker = other and other.state == "step" and not world:enemies(self.side, other.side)
+    if (not walker or t - self.blockedSince >= DETOUR_WAIT * 5) and t >= (self.detourAfter or 0) then
+        if self:detour() then
+            self.blockedSince = nil
+            return false
+        end
+        self.detourAfter = t + DETOUR_RETRY
+    end
     if t - self.blockedSince > 400 or (other and other.state == "idle") then
         self.blockedSince = nil
         self.repath = true
