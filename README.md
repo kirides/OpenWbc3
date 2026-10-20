@@ -86,6 +86,22 @@ Options: volumes, scroll speed, full screen and vsync (stored in `openwbc3.ini`)
 
 ## Running
 
+### Nightly builds (no LÖVE needed)
+
+Every night a build of `main` is published on the [releases page](../../releases/tag/nightly), with LÖVE 12 already
+bundled:
+
+- **Windows:** unzip `openwbc3-windows-x64.zip` and run `openwbc3.exe`.
+- **Linux:** `chmod +x openwbc3-linux-x86_64.AppImage`, then run it.
+- **Other platforms:** install a LÖVE 12 build and run `love openwbc3.love`.
+
+You still need Warlords Battlecry III installed (GOG). The game finds it by itself; otherwise pass the folder,
+e.g. `openwbc3.exe --data "D:\GOG Games\Warlords Battlecry 3"` or `./openwbc3-linux-x86_64.AppImage --data ~/wbc3`, or
+set it in `openwbc3.ini` as described below. All command line options below work the same way, just leave out
+`love game`.
+
+### From source
+
 1. Get LÖVE 12.0 (codename "Bestest Friend"), which is not released yet, so you need a pre-release build.
    See the [LÖVE 12.0 wiki page](https://love2d.org/wiki/12.0) and the [LÖVE GitHub repository](https://github.com/love2d/love).
    Download either the work-in-progress [GitHub Actions builds](https://github.com/love2d/love/actions?query=branch%3Amain+event%3Apush)
@@ -112,7 +128,7 @@ Options: volumes, scroll speed, full screen and vsync (stored in `openwbc3.ini`)
 
 3. Optional: convert the videos (see below) so the intro and campaign videos play.
 
-Useful command line options (after `love game`):
+Useful command line options (after `love game`, or directly after the nightly executable):
 
 | option | effect |
 |---|---|
