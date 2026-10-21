@@ -77,6 +77,7 @@ local CW, CH = 32, 24
 ---@field chat {text: string, mode: "all"|"allies"|"enemies"}?
 ---@field totals table?
 ---@field totalsAt number?
+---@field tickAcc number?               real seconds not yet run as a simulation tick (S:stepWorld)
 local S = {}
 
 -- The outcome of a battle, made by the "gameover" event; the victory, results, level-up and retinue screens read it.
@@ -960,6 +961,20 @@ function S:underUpdate(dt)
     self.fog:update(self.world.time)
 end
 
+-- Advances a game without network by the same fixed ticks a network game runs (lockstep.TICK, 30 a second): the
+-- simulation then does not depend on the frame rate (no time lost at the end of each walking step or swing, the
+-- same results at 30 and at 144 frames a second). The original's own tick rate is not traced in the 1.04 binary yet.
+---@param dt number real seconds of this frame
+function S:stepWorld(dt)
+    local tick = require("src.game.lockstep").TICK
+    local acc = (self.tickAcc or 0) + dt
+    while acc >= tick - 1e-9 do                         -- the tolerance: two 1/60 s frames make a tick
+        acc = acc - tick
+        self.world:update(tick)
+    end
+    self.tickAcc = math.max(acc, 0)
+end
+
 function S:update(dt)
     dt = math.min(dt, 0.1)
     self.hud:layout()
@@ -991,7 +1006,7 @@ function S:update(dt)
     if self.net then
         self:underUpdate(dt)
     elseif not self.paused and not self.result then
-        self.world:update(dt)
+        self:stepWorld(dt)
     end
     self.fog:update(self.world.time)
     self.fx:update(dt)
@@ -1122,7 +1137,7 @@ end
 ---@param dt number
 function S:runBackground(dt)
     if self.net or self.paused or self.result then return end
-    self.world:update(dt)
+    self:stepWorld(dt)
     self.fog:update(self.world.time)
     self.fx:update(dt)
 end
