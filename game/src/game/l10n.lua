@@ -59,6 +59,7 @@ local OWN = {
         ["Saving failed"] = "Speichern fehlgeschlagen",
         ["Loading failed"] = "Laden fehlgeschlagen",
         -- options
+        ["Display"] = "Anzeige",
         ["Fog of war mode: %s"] = "Kriegsnebel-Modus: %s",
         ["Modern"] = "Modern",
         ["Classic"] = "Klassisch",

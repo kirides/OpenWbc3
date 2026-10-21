@@ -1694,7 +1694,12 @@ which was wrong), group move (slowest unit or as fast as possible, Ctrl does the
 pauses / visits the last message, left / right click interface (left: a left click on the ground or an enemy
 orders the selection, right click deselects), system voice (female `SystemF<n>.wav` is the original's default),
 tips, SFX / music volume, unit speech, the music set, mouse click effects, resolution (window size), plus openwbc3's own full
-screen, vsync and interface scale buttons. Unit speech frequency "Sometimes" is 2 in 5 for select / order lines,
+screen, vsync and interface scale buttons. openwbc3 adds a Display tab between Gameplay and Graphics (resolution and gamma,
+moved from the original's Graphics tab, then full screen, vsync and interface scale); its tab labels sit right of their
+radios so that four tabs fit the original's row. A tab's options fill the original's ten buttons (all the background
+holds) left to right, then down (the original lists of Gameplay and Sound, numbered by columns, are interleaved so that
+they keep the original's places); more go on further pages behind arrows under the right column (`options.lua`).
+Unit speech frequency "Sometimes" is 2 in 5 for select / order lines,
 as in the sound request `FUN_0050be80`. The original's graphics / audio / main options screens (`PNL_OPTIONS_GRAPHICS`,
 `_AUDIO`, `PNL_MAIN_OPTIONS`) are older prototypes that the game does not open (the retail options screen is
 `PNL_GAMEOPTIONS`); the in-battle options dialog is replaced by the same screen.

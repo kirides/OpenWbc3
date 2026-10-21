@@ -147,6 +147,7 @@ end
 ---@field quads table<integer, love.Quad>?  button rows, cached
 ---@field quad love.Quad?                    image part, cached
 ---@field scale number?                      drawn and hit at this size (openwbc3's additions, e.g. bigger arrows)
+---@field textX number?                      left-aligned text this far in (default 12, the drop-down buttons)
 
 ---@class PanelOpts
 ---@field x number?
@@ -326,7 +327,8 @@ function Panel:drawItem(it)
             local d, f = fonts.get(fid)
             if d then
                 if self.align[it] == "left" then       -- drop-down buttons: text on the left, arrow on the right
-                    fonts.print(fid, s, x + 12, y + fonts.middleY(fid, ob.h), "left", ob.w - 36)
+                    local tx = it.textX or 12
+                    fonts.print(fid, s, x + tx, y + fonts.middleY(fid, ob.h), "left", ob.w - tx - 24)
                 else
                     fonts.print(fid, s, x, y + fonts.middleY(fid, ob.h), "center", ob.w)
                 end

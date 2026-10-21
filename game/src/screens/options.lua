@@ -1,10 +1,11 @@
--- Options screen (panel PNL_GAMEOPTIONS): three tabs (Gameplay, Graphics, Sound) of up to
+-- Options screen (panel PNL_GAMEOPTIONS): the original's three tabs (Gameplay, Graphics, Sound) of up to
 -- ten drop-down buttons in two columns, Credits, Okay (keeps the changes) and Cancel (restores the settings the
 -- screen was opened with). The texts are the XCI texts the original uses (TXT_OPTIONS_*, ids 259..274, 346, 312);
 -- the lists and their meaning follow the original screen. Settings live in
 -- openwbc3.ini (src/core/gameopts.lua says which values are the original's defaults).
--- Additions of openwbc3 (not in the original screen): full screen, vertical sync and interface scale buttons on the
--- Graphics tab and the fog of war's look, and a language dropdown on the Gameplay tab (the original picks its language from the folders the
+-- Additions of openwbc3 (not in the original screen): a Display tab between Gameplay and Graphics with the original's
+-- resolution and gamma buttons and openwbc3's full screen, vertical sync and interface scale, the spell bar and the
+-- fog of war's look on the Graphics tab, and a language dropdown on the Gameplay tab (the original picks its language from the folders the
 -- install has and has no way to change it once running) - picking it there only stores it in openwbc3.ini, so the
 -- data already loaded this session stays as it is and the new language applies on the next start. The original's
 -- CPU / RAM / version lines and the EAX, 3D provider and music-set entries are left out (EAX is shown greyed as
@@ -22,7 +23,7 @@ local strings = require("src.game.strings")
 local fs = require("src.core.fs")
 local l10n = require("src.game.l10n")
 
--- A tab's options fill the original's ten buttons, then openwbc3's EXTRA_ROWS rows below them; what does not fit goes
+-- A tab's options fill the original's ten buttons (and EXTRA_ROWS rows below them, none); what does not fit goes
 -- on further pages behind two arrows (openwbc3's own, shown only for a tab with more than one page).
 -- One drop-down button of a tab: its label, its list and what picking an entry does.
 ---@class OptionSpec
@@ -36,10 +37,10 @@ local l10n = require("src.game.l10n")
 ---@field musicSet0 string           the music set it was opened with
 ---@field lang0 string?
 ---@field modes { [1]: integer, [2]: integer }[]   the display modes (width, height) of the resolution list
----@field tab integer                1 Gameplay, 2 Graphics, 3 Sound
+---@field tab integer                1 Gameplay, 2 Display, 3 Graphics, 4 Sound
 ---@field panel Panel                PNL_GAMEOPTIONS
----@field slots PanelItem[]          the drop-downs of a page: the original's ten (left column, then right column), then
----                                  openwbc3's rows under them (left, right)
+---@field slots PanelItem[]          the drop-downs of a page, left to right, then down: the original's ten, then
+---                                  openwbc3's rows under them
 ---@field original integer          how many of `slots` are the original's buttons
 ---@field tabs PanelItem[]
 ---@field page integer               page of the current tab (1 ..)
@@ -150,18 +151,32 @@ local function effect(id, sub, name)
     }
 end
 
-local TABS = { "gameplay", "graphics", "sound" }
+local TABS = { "gameplay", "display", "graphics", "sound" }
 
 local function fogMode(on) return l10n.own("Fog of war mode: %s"):format(l10n.own(on and "Modern" or "Classic")) end
 
--- Rows of openwbc3's buttons under the original's five (the space down to the page arrows and Credits).
-local EXTRA_ROWS = 2
+-- Rows of openwbc3's buttons under the original's five: none, the background holds five rows a column.
+local EXTRA_ROWS = 0
 local ARROW_SCALE = 1.5
+local TAB_STEP = 110
 
--- Specs per tab, slot 1..5 left column, 6..10 right column (the original's buttons are numbered in that order).
+-- The original's list of a tab, numbered as its buttons are (1..5 the left column, 6..10 the right one), in the
+-- screen's order: left to right, then down.
+---@param list OptionSpec[]
+---@return OptionSpec[]
+local function byColumns(list)
+    local out, rows = {}, math.ceil(#list / 2)
+    for r = 1, rows do
+        out[#out + 1] = list[r]
+        out[#out + 1] = list[rows + r]
+    end
+    return out
+end
+
+-- Specs per tab in the screen's order: left to right, then down, then the next page.
 ---@type table<string, OptionSpec[]>
 local SPECS = {
-    gameplay = {
+    gameplay = byColumns({
         { items = function() return { T(263, 2), T(263, 1), T(263, 0) } end,
           pick = function(i) opts.set("helplevel", i - 1) end,
           label = function() return T(263, 2 - math.max(0, math.min(2, opts.helpLevel()))) end },
@@ -203,8 +218,10 @@ local SPECS = {
         { items = function() return { "Hero resurrection: " .. onOff(true), "Hero resurrection: " .. onOff(false) } end,
           pick = function(i) config.set("skirmish", "resurrect", i == 1) end,
           label = function() return "Hero resurrection: " .. onOff(config.get("skirmish", "resurrect", false) == true) end },
-    },
-    graphics = {
+    }),
+    -- openwbc3's own tab: the window settings, the original's resolution and gamma buttons (taken from its Graphics tab)
+    -- and openwbc3's full screen, vertical sync and interface scale
+    display = {
         { items = function()
               local out = {}
               for _, m in ipairs(S.modes) do out[#out + 1] = fmt(266, 0, m[1] .. " x " .. m[2]) end
@@ -221,16 +238,7 @@ local SPECS = {
               local w, h = love.graphics.getDimensions()
               return fmt(266, 0, w .. " x " .. h)
           end },
-        toggle(266, 1, "shadows"),
-        toggle(266, 2, "ambient"),
-        toggle(266, 3, "blood"),
         level(266, 4, "gamma", 5, 270, 0),
-        pair(346, 0, 1, function() return opts.get("floattext") ~= false end, function(v) opts.set("floattext", v) end),
-        effect(266, 6, "particles"),
-        toggle(266, 7, "decals"),
-        effect(267, 0, "lighting"),
-        pair(267, 1, 2, function() return opts.get("mouseeffects") ~= false end, function(v) opts.set("mouseeffects", v) end),
-        -- openwbc3's own from here
         { label = function() return "Full screen: " .. onOff(love.window.getFullscreen()) end,
           items = function() return { "Full screen: " .. onOff(true), "Full screen: " .. onOff(false) } end,
           pick = function(i) config.set("graphics", "fullscreen", i == 1); applyWindow() end },
@@ -244,6 +252,17 @@ local SPECS = {
               return out
           end,
           pick = function(i) config.set("graphics", "uiscale", 40 + i * 10) end },
+    },
+    graphics = {
+        toggle(266, 1, "shadows"),
+        toggle(266, 2, "ambient"),
+        toggle(266, 3, "blood"),
+        pair(346, 0, 1, function() return opts.get("floattext") ~= false end, function(v) opts.set("floattext", v) end),
+        effect(266, 6, "particles"),
+        toggle(266, 7, "decals"),
+        effect(267, 0, "lighting"),
+        pair(267, 1, 2, function() return opts.get("mouseeffects") ~= false end, function(v) opts.set("mouseeffects", v) end),
+        -- openwbc3's own from here
         -- openwbc3's own, off like the original (which has no such bar): the strip of learned spells above the panel
         { label = function() return "Spell bar: " .. onOff(opts.get("spellbar") == true) end,
           items = function() return { "Spell bar: " .. onOff(true), "Spell bar: " .. onOff(false) } end,
@@ -253,7 +272,7 @@ local SPECS = {
           items = function() return { fogMode(true), fogMode(false) } end,
           pick = function(i) opts.set("smoothfog", i == 1) end },
     },
-    sound = {
+    sound = byColumns({
         toggle(268, 1, "envsound"),
         toggle(268, 2, "footsteps"),
         { items = function()
@@ -292,7 +311,7 @@ local SPECS = {
               end
               return ""
           end },
-    },
+    }),
 }
 
 -- noDim: kept for the callers that open the screen over a dialog; the panel covers the whole canvas anyway.
@@ -305,16 +324,16 @@ function S:enter()
     local p = UI.panel("PNL_GAMEOPTIONS", { x = 0, y = 0, onButton = function(name, it) self:button(name, it) end })
     ---@cast p -nil
     self.panel = p
-    -- the droplist buttons by slot: left column top to bottom, then right column
+    -- the droplist buttons by slot: left to right, then down
     local list = p:all("BUTT_OPTIONS_DROPLIST")
     table.sort(list, function(a, b)
-        if a.e.x ~= b.e.x then return a.e.x < b.e.x end
-        return a.e.y < b.e.y
+        if a.e.y ~= b.e.y then return a.e.y < b.e.y end
+        return a.e.x < b.e.x
     end)
     self.original = #list
     -- openwbc3's rows under the original's: in the columns of its buttons, at its row spacing
-    local left, right = list[1], list[#list]
-    local step = list[2].e.y - list[1].e.y
+    local left, right = list[1], list[2]
+    local step = list[3].e.y - list[1].e.y
     for row = 1, EXTRA_ROWS do
         local y = left.e.y + (self.original / 2 - 1 + row) * step
         list[#list + 1] = p:add("BUTT_OPTIONS_DROPLIST", left.e.x, y, "EXTRA")
@@ -335,8 +354,30 @@ function S:enter()
         it.scale = ARROW_SCALE
         p.itemStrings[it] = ""
     end
-    self.tabs = p:all("BUTT_GAMEOPTIONS_OPTION")
-    for i, it in ipairs(self.tabs) do p.itemStrings[it] = T(259, i - 1) end
+    -- the tabs: the original's three (Gameplay, Graphics, Sound) and openwbc3's Display second, all four spread over
+    -- the original's row
+    local tabs = p:all("BUTT_GAMEOPTIONS_OPTION")
+    table.sort(tabs, function(a, b) return a.e.x < b.e.x end)
+    local first = tabs[1]
+    local display = p:add("BUTT_GAMEOPTIONS_OPTION", 0, first.e.y)
+    ---@cast display -nil
+    table.insert(tabs, 2, display)
+    -- in the panel's list before Graphics: where a tab's 140-pixel hit box runs into the next one, the next one's
+    -- radio wins (the last item is hit first)
+    table.remove(p.items)
+    for i, it in ipairs(p.items) do
+        if it == tabs[3] then table.insert(p.items, i, display) break end
+    end
+    -- a tab is its radio with the text just right of it (the original centres it in the 140-pixel box, which leaves no
+    -- room for a fourth); 110 pixels apart they fit the original's row
+    for i, it in ipairs(tabs) do
+        it.e.x = first.e.x + (i - 1) * TAB_STEP
+        it.textX = 24
+        p.align[it] = "left"
+    end
+    self.tabs = tabs
+    local tabText = { T(259, 0), l10n.own("Display"), T(259, 1), T(259, 2) }
+    for i, it in ipairs(self.tabs) do p.itemStrings[it] = tabText[i] end
     -- hide the info lines (CPU / RAM / version) and give the title and the buttons their texts
     for _, it in ipairs(p:all("STR_MEDIUM200")) do p.itemStrings[it] = "" end
     p.itemStrings[p:find("STR_LARGE750")] = T(0, 3)
