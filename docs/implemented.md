@@ -470,6 +470,11 @@ Small rule gaps (the original's behaviour; 1.04 binary anchors where given, the 
   (follows `customfont`) instead of LÖVE's default.
 - The spell bar above the panel is openwbc3's own and off by default: Options, Graphics, "Spell bar" (`[options]
   spellbar` in openwbc3.ini).
+- The fog of war's look is openwbc3's own: Options, Graphics, "Fog of war mode" (`[options] smoothfog`). Modern
+  (default): soft sight circles drawn round every viewer at its pixel position each frame, with the cleared ground
+  kept as round-edged explored ground; Classic: the cells as a 1-pixel-per-cell texture with linear filtering. What is seen stays by cells either way (`fog.lua`). The original
+  draws the fog by cells with edge pieces from the 8 neighbours of a smoothed cell grid (`FUN_0047f110`,
+  `FUN_0047d880`); that is not ported.
 
 Game rules from the scenario / skirmish options: tech level (0..5) and No Dragons / Eyries / Titans / Towers /
 Walls limit building and production (`Eco:levelOk`, after the original's level test `FUN_0040c990`; the production list tests the

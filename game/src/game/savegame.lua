@@ -570,6 +570,7 @@ function M.apply(battle, data)
     eco.nextVictory = world.time + 3000
     if data.explored and world.fog then
         unrle(data.explored, world.fog.explored, world.fog.w * world.fog.h)
+        world.fog.uncovered = true
     end
     battle.restoreCamera = data.camera
     battle.restoreRadius = data.radius

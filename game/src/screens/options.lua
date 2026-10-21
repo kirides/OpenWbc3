@@ -4,7 +4,7 @@
 -- the lists and their meaning follow the original screen. Settings live in
 -- openwbc3.ini (src/core/gameopts.lua says which values are the original's defaults).
 -- Additions of openwbc3 (not in the original screen): full screen, vertical sync and interface scale buttons on the
--- Graphics tab, and a language dropdown on the Gameplay tab (the original picks its language from the folders the
+-- Graphics tab and the fog of war's look, and a language dropdown on the Gameplay tab (the original picks its language from the folders the
 -- install has and has no way to change it once running) - picking it there only stores it in openwbc3.ini, so the
 -- data already loaded this session stays as it is and the new language applies on the next start. The original's
 -- CPU / RAM / version lines and the EAX, 3D provider and music-set entries are left out (EAX is shown greyed as
@@ -20,7 +20,10 @@ local music = require("src.audio.music")
 local sound = require("src.audio.sound")
 local strings = require("src.game.strings")
 local fs = require("src.core.fs")
+local l10n = require("src.game.l10n")
 
+-- A tab's options fill the original's ten buttons, then openwbc3's EXTRA_ROWS rows below them; what does not fit goes
+-- on further pages behind two arrows (openwbc3's own, shown only for a tab with more than one page).
 -- One drop-down button of a tab: its label, its list and what picking an entry does.
 ---@class OptionSpec
 ---@field label fun(): string
@@ -35,9 +38,12 @@ local fs = require("src.core.fs")
 ---@field modes { [1]: integer, [2]: integer }[]   the display modes (width, height) of the resolution list
 ---@field tab integer                1 Gameplay, 2 Graphics, 3 Sound
 ---@field panel Panel                PNL_GAMEOPTIONS
----@field slots PanelItem[]          the ten drop-downs: left column, then right column
----@field extra PanelItem[]          openwbc3's four drop-downs under the lists (Graphics tab)
+---@field slots PanelItem[]          the drop-downs of a page: the original's ten (left column, then right column), then
+---                                  openwbc3's rows under them (left, right)
+---@field original integer          how many of `slots` are the original's buttons
 ---@field tabs PanelItem[]
+---@field page integer               page of the current tab (1 ..)
+---@field arrows PanelItem[]         previous / next page
 ---@field resolutions fun(): { [1]: integer, [2]: integer }[]   for the setup screen's resolution button
 ---@field applyWindow fun()
 local S = { overlay = true }
@@ -146,6 +152,12 @@ end
 
 local TABS = { "gameplay", "graphics", "sound" }
 
+local function fogMode(on) return l10n.own("Fog of war mode: %s"):format(l10n.own(on and "Modern" or "Classic")) end
+
+-- Rows of openwbc3's buttons under the original's five (the space down to the page arrows and Credits).
+local EXTRA_ROWS = 2
+local ARROW_SCALE = 1.5
+
 -- Specs per tab, slot 1..5 left column, 6..10 right column (the original's buttons are numbered in that order).
 ---@type table<string, OptionSpec[]>
 local SPECS = {
@@ -218,6 +230,28 @@ local SPECS = {
         toggle(266, 7, "decals"),
         effect(267, 0, "lighting"),
         pair(267, 1, 2, function() return opts.get("mouseeffects") ~= false end, function(v) opts.set("mouseeffects", v) end),
+        -- openwbc3's own from here
+        { label = function() return "Full screen: " .. onOff(love.window.getFullscreen()) end,
+          items = function() return { "Full screen: " .. onOff(true), "Full screen: " .. onOff(false) } end,
+          pick = function(i) config.set("graphics", "fullscreen", i == 1); applyWindow() end },
+        { label = function() return "Vertical sync: " .. onOff(config.get("graphics", "vsync", true)) end,
+          items = function() return { "Vertical sync: " .. onOff(true), "Vertical sync: " .. onOff(false) } end,
+          pick = function(i) config.set("graphics", "vsync", i == 1); applyWindow() end },
+        { label = function() return ("Interface scale: %d%%"):format(config.get("graphics", "uiscale", 100)) end,
+          items = function()
+              local out = {}
+              for v = 50, 100, 10 do out[#out + 1] = ("Interface scale: %d%%"):format(v) end
+              return out
+          end,
+          pick = function(i) config.set("graphics", "uiscale", 40 + i * 10) end },
+        -- openwbc3's own, off like the original (which has no such bar): the strip of learned spells above the panel
+        { label = function() return "Spell bar: " .. onOff(opts.get("spellbar") == true) end,
+          items = function() return { "Spell bar: " .. onOff(true), "Spell bar: " .. onOff(false) } end,
+          pick = function(i) opts.set("spellbar", i == 1) end },
+        -- the soft fog that follows the armies (Modern, the default) or the fog by cells (Classic); see game/fog.lua
+        { label = function() return fogMode(opts.get("smoothfog") ~= false) end,
+          items = function() return { fogMode(true), fogMode(false) } end,
+          pick = function(i) opts.set("smoothfog", i == 1) end },
     },
     sound = {
         toggle(268, 1, "envsound"),
@@ -277,16 +311,30 @@ function S:enter()
         if a.e.x ~= b.e.x then return a.e.x < b.e.x end
         return a.e.y < b.e.y
     end)
+    self.original = #list
+    -- openwbc3's rows under the original's: in the columns of its buttons, at its row spacing
+    local left, right = list[1], list[#list]
+    local step = list[2].e.y - list[1].e.y
+    for row = 1, EXTRA_ROWS do
+        local y = left.e.y + (self.original / 2 - 1 + row) * step
+        list[#list + 1] = p:add("BUTT_OPTIONS_DROPLIST", left.e.x, y, "EXTRA")
+        list[#list + 1] = p:add("BUTT_OPTIONS_DROPLIST", right.e.x, y, "EXTRA")
+    end
     self.slots = list
     for _, it in ipairs(list) do p.align[it] = "left" end
-    -- four more drop-downs below the lists on the Graphics tab (openwbc3's own settings)
-    self.extra = {
-        p:add("BUTT_OPTIONS_DROPLIST", 136, 389, "EXTRA1"),
-        p:add("BUTT_OPTIONS_DROPLIST", 409, 389, "EXTRA2"),
-        p:add("BUTT_OPTIONS_DROPLIST", 136, 424, "EXTRA3"),
-        p:add("BUTT_OPTIONS_DROPLIST", 409, 424, "EXTRA4"),
-    }
-    for _, it in ipairs(self.extra) do p.align[it] = "left" end
+    -- the page arrows at 1.5 times their size, a row further down, ending with the right column
+    self.page = self.page or 1
+    local prev, nxt = p:add("BUTT_LEFT_20", 0, 0, "PAGEPREV"), p:add("BUTT_RIGHT_20", 0, 0, "PAGENEXT")
+    ---@cast prev -nil
+    ---@cast nxt -nil
+    self.arrows = { prev, nxt }
+    local aw, ah = nxt.ob.w * ARROW_SCALE, nxt.ob.h * ARROW_SCALE
+    local ax, ay = right.e.x + right.ob.w - aw, left.e.y + (self.original / 2 + EXTRA_ROWS) * step + (step - ah) / 2
+    prev.e.x, prev.e.y, nxt.e.x, nxt.e.y = ax - aw - 6, ay, ax, ay
+    for _, it in ipairs(self.arrows) do
+        it.scale = ARROW_SCALE
+        p.itemStrings[it] = ""
+    end
     self.tabs = p:all("BUTT_GAMEOPTIONS_OPTION")
     for i, it in ipairs(self.tabs) do p.itemStrings[it] = T(259, i - 1) end
     -- hide the info lines (CPU / RAM / version) and give the title and the buttons their texts
@@ -301,42 +349,34 @@ end
 
 function S:leave() dropdown.close() end
 
----@return OptionSpec[]
-function S:extraSpecs()
-    return {
-        { label = function() return "Full screen: " .. onOff(love.window.getFullscreen()) end,
-          items = function() return { "Full screen: " .. onOff(true), "Full screen: " .. onOff(false) } end,
-          pick = function(i) config.set("graphics", "fullscreen", i == 1); applyWindow() end },
-        { label = function() return "Vertical sync: " .. onOff(config.get("graphics", "vsync", true)) end,
-          items = function() return { "Vertical sync: " .. onOff(true), "Vertical sync: " .. onOff(false) } end,
-          pick = function(i) config.set("graphics", "vsync", i == 1); applyWindow() end },
-        { label = function() return ("Interface scale: %d%%"):format(config.get("graphics", "uiscale", 100)) end,
-          items = function()
-              local out = {}
-              for v = 50, 100, 10 do out[#out + 1] = ("Interface scale: %d%%"):format(v) end
-              return out
-          end,
-          pick = function(i) config.set("graphics", "uiscale", 40 + i * 10) end },
-        -- openwbc3's own, off like the original (which has no such bar): the strip of learned spells above the panel
-        { label = function() return "Spell bar: " .. onOff(opts.get("spellbar") == true) end,
-          items = function() return { "Spell bar: " .. onOff(true), "Spell bar: " .. onOff(false) } end,
-          pick = function(i) opts.set("spellbar", i == 1) end },
-    }
+-- The number of pages of the current tab.
+---@return integer
+function S:pages()
+    return math.max(1, math.ceil(#SPECS[TABS[self.tab]] / #self.slots))
 end
 
--- Texts and states of the ten buttons for the current tab.
+-- The option of slot i on the current page.
+---@param i integer
+---@return OptionSpec?
+function S:slotSpec(i)
+    return SPECS[TABS[self.tab]][(self.page - 1) * #self.slots + i]
+end
+
+-- Texts and states of the buttons for the current tab and page. On the first page the original's ten stay as greyed
+-- empty buttons when a tab has fewer options (as on the original screen); every other unused button is hidden.
 function S:refresh()
     local p = self.panel
-    local specs = SPECS[TABS[self.tab]]
+    local pages = self:pages()
+    self.page = math.max(1, math.min(pages, self.page))
     for i, it in ipairs(self.slots) do
-        local spec = specs[i]
+        local spec = self:slotSpec(i)
+        p:hideItem(it, spec == nil and (self.page > 1 or i > self.original))
         p:setItemDisabled(it, spec == nil or spec.disabled)
         p.itemStrings[it] = spec and spec.label() or ""
     end
-    local extras = self.tab == 2 and self:extraSpecs() or {}
-    for i, it in ipairs(self.extra) do
-        p:hideItem(it, extras[i] == nil)
-        p.itemStrings[it] = extras[i] and extras[i].label() or ""
+    for i, it in ipairs(self.arrows) do
+        p:hideItem(it, pages == 1)
+        p:setItemDisabled(it, self.page == (i == 1 and 1 or pages))
     end
 end
 
@@ -344,10 +384,7 @@ end
 ---@return OptionSpec?
 function S:specFor(it)
     for i, s in ipairs(self.slots) do
-        if s == it then return SPECS[TABS[self.tab]][i] end
-    end
-    for i, s in ipairs(self.extra) do
-        if s == it then return self:extraSpecs()[i] end
+        if s == it then return self:slotSpec(i) end
     end
 end
 
@@ -382,9 +419,13 @@ function S:button(name, it)
     elseif name == "BUTT_CANCEL_STARTUP" then self:finish(false)
     elseif name == "BUTT_CREDITS_200" then screens.push(require("src.screens.credits"))
     elseif name == "BUTT_GAMEOPTIONS_OPTION" then
-        for i, t in ipairs(self.tabs) do if t == it then self.tab = i end end
+        for i, t in ipairs(self.tabs) do if t == it then self.tab, self.page = i, 1 end end
         self:refresh()
-    elseif name == "BUTT_OPTIONS_DROPLIST" or name:match("^EXTRA%d$") then
+    elseif name == "PAGEPREV" or name == "PAGENEXT" then
+        dropdown.close()
+        self.page = self.page + (name == "PAGEPREV" and -1 or 1)
+        self:refresh()
+    elseif name == "BUTT_OPTIONS_DROPLIST" or name == "EXTRA" then
         local spec = self:specFor(it)
         if not spec or not spec.items then return end
         local mx, my = UI.toVirtual(love.mouse.getPosition())
@@ -447,8 +488,10 @@ function S:keypressed(key)
     end
 end
 
--- Dev: --show options:graphics | sound | gameplay
+-- Dev: --show options:graphics | sound | gameplay, with a page number after the name (graphics2)
 function S:dev(sub)
+    self.page = tonumber(sub:match("%d+$")) or 1
+    sub = sub:gsub("%d+$", "")
     for i, n in ipairs(TABS) do if n == sub then self.tab = i end end
     self:refresh()
 end

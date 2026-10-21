@@ -59,6 +59,7 @@ local DEFS = {
     lighting = { "options", "lighting", 1 },
     mouseeffects = { "options", "mouseeffects", true },
     spellbar = { "options", "spellbar", false },          -- openwbc3's own, off: the original has no spell bar
+    smoothfog = { "options", "smoothfog", true },         -- openwbc3's own, on: the soft fog of fog.lua (off: by cells)
 }
 
 -- The stored value of an option of DEFS (number or boolean, the type of its default).

@@ -58,6 +58,10 @@ local OWN = {
         -- saving and loading
         ["Saving failed"] = "Speichern fehlgeschlagen",
         ["Loading failed"] = "Laden fehlgeschlagen",
+        -- options
+        ["Fog of war mode: %s"] = "Kriegsnebel-Modus: %s",
+        ["Modern"] = "Modern",
+        ["Classic"] = "Klassisch",
         ["Loading failed: %s"] = "Laden fehlgeschlagen: %s",
         ["No saved games for this hero"] = "Keine gespeicherten Spiele für diesen Helden",
         -- main menu, cutscenes

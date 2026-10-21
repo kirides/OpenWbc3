@@ -146,6 +146,7 @@ end
 ---@field name string
 ---@field quads table<integer, love.Quad>?  button rows, cached
 ---@field quad love.Quad?                    image part, cached
+---@field scale number?                      drawn and hit at this size (openwbc3's additions, e.g. bigger arrows)
 
 ---@class PanelOpts
 ---@field x number?
@@ -315,7 +316,7 @@ function Panel:drawItem(it)
                 q = g.newQuad(0, row * ob.h, math.min(ob.w, img:getWidth()), ob.h, img:getDimensions())
                 it.quads[row] = q
             end
-            g.draw(img, q, x, y)
+            g.draw(img, q, x, y, 0, it.scale or 1)
         end
         local s = self.itemStrings[it] or self.strings[it.name] or buttonText(ob)
         if s and ob.fonts then
@@ -383,8 +384,8 @@ function Panel:over(vx, vy)
         if (t == T.BUTTON or t == T.EDITOR or t == T.SCROLLBAR or t == T.LISTBOX)
             and not self.hidden[it.name] and not self.itemHidden[it]
             and (self.itemState[it] or self.state[it.name] or 0) ~= 3 then
-            local x, y = self.x + it.e.x, self.y + it.e.y
-            if vx >= x and vy >= y and vx < x + it.ob.w and vy < y + it.ob.h then return true end
+            local x, y, sc = self.x + it.e.x, self.y + it.e.y, it.scale or 1
+            if vx >= x and vy >= y and vx < x + it.ob.w * sc and vy < y + it.ob.h * sc then return true end
         end
     end
     return false
@@ -399,8 +400,8 @@ function Panel:hit(vx, vy)
         local it = self.items[i]
         if it.ob.type == T.BUTTON and not self.hidden[it.name] and not self.itemHidden[it]
             and (self.itemState[it] or self.state[it.name] or 0) ~= 3 then
-            local x, y = self.x + it.e.x, self.y + it.e.y
-            if vx >= x and vy >= y and vx < x + it.ob.w and vy < y + it.ob.h then return it end
+            local x, y, sc = self.x + it.e.x, self.y + it.e.y, it.scale or 1
+            if vx >= x and vy >= y and vx < x + it.ob.w * sc and vy < y + it.ob.h * sc then return it end
         end
     end
 end

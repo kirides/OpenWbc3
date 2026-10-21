@@ -450,6 +450,7 @@ local function uncover(world, gx, gy, radius, pick)
         end
     end
     fog.dirty = true
+    fog.uncovered = true
 end
 
 local function ring(world, ef, r, col, dur)

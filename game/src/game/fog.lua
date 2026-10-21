@@ -1,6 +1,10 @@
 -- Fog of war for one viewing side: cells are unexplored (black), explored but
--- not currently seen (dimmed) or visible. Rendered as a 1-pixel-per-cell
--- texture stretched over the map with linear filtering for soft edges.
+-- not currently seen (dimmed) or visible. The cells decide what is seen; the screen draws soft sight circles round
+-- every viewer at its pixel position each frame and keeps what they have cleared as its explored ground (the explored
+-- cells come in only when something else uncovers the map), so the fog moves with the armies and its edges are round.
+-- That is the option "Fog of war mode: Modern" (smoothfog, on); "Classic" draws the cells alone, a 1-pixel-per-cell
+-- texture with linear filtering. Both looks are openwbc3's own: the original draws the fog cell by cell with edge
+-- pieces picked from the 8 neighbours of a smoothed cell grid (FUN_0047f110 smooths, FUN_0047d880 picks).
 local ffi = require("ffi")
 
 local M = {}
@@ -32,6 +36,11 @@ end
 ---@field hiddenOnly boolean?       the hidden map alone (fog mode 4): explored counts as seen (battle screen)
 ---@field data love.ImageData?      the texture's pixels (not in a headless run / for the simulation's fog)
 ---@field image love.Image?
+---@field expData love.ImageData?  the explored cells (r8), sampled by the screen's fog shader
+---@field expImage love.Image?
+---@field sight love.Canvas?        the sight circles of this frame (SIGHT_PX pixels a texel)
+---@field seen love.Canvas?         the ground the sight circles have cleared so far, the explored cells merged in
+---@field uncovered boolean?        explored cells were set by something else than sight: merge them into `seen`
 ---@field dirty boolean?            the texture needs refreshing
 ---@field simMode integer?          the simulation's fog: the game's fog mode (M.mode)
 ---@field simSlice integer?         the attitude slice it was last recomputed in
@@ -54,7 +63,10 @@ function M.new(world, side, simOnly)
         enabled = true,
         dim = 110,                 -- darkness (0..255) of explored ground out of sight; 0 = stays lit
     }, Fog)
-    if not simOnly then self.data = love.image and love.image.newImageData(w, h) or nil end
+    if not simOnly and love.image then
+        self.data = love.image.newImageData(w, h)
+        self.expData = love.image.newImageData(w, h, "r8")
+    end
     return self
 end
 
@@ -62,6 +74,7 @@ end
 function Fog:revealAll()
     for i = 0, self.w * self.h - 1 do self.explored[i] = 1 end
     self.dirty = true
+    self.uncovered = true
 end
 
 function Fog:allied(side)
@@ -91,19 +104,26 @@ local function stamp(self, gx, gy, r)
     end
 end
 
-function Fog:recompute()
+-- Calls fn(gx, gy, radius, x, y) for every army and building that gives this side sight (x, y: its pixel position).
+---@param fn fun(gx: integer, gy: integer, r: integer, x: number, y: number)
+function Fog:eachViewer(fn)
     local world = self.world
-    ffi.fill(self.visible, self.w * self.h, 0)
     for _, u in ipairs(world.units) do
         if u:alive() and self:allied(u.side) then
-            stamp(self, u.gx, u.gy, M.radius(u.type and u.type.view) + (world.sides[u.side].trueSight and 2 or 0) + (world.sides[u.side].visionBonus or 0))
+            local sd = world.sides[u.side]
+            fn(u.gx, u.gy, M.radius(u.type and u.type.view) + (sd.trueSight and 2 or 0) + (sd.visionBonus or 0), u.x, u.y)
         end
     end
     for _, b in ipairs(world.buildings) do
         if b.hp > 0 and self:allied(b.side) then
-            stamp(self, b.gx, b.gy + 1, 8)
+            fn(b.gx, b.gy + 1, 8, b.gx * 32 + 16, (b.gy + 1) * 24 + 12)
         end
     end
+end
+
+function Fog:recompute()
+    ffi.fill(self.visible, self.w * self.h, 0)
+    self:eachViewer(function(gx, gy, r) stamp(self, gx, gy, r) end)
     self.dirty = true
 end
 
@@ -135,22 +155,108 @@ function Fog:refreshTexture()
         local o = i * 4
         p[o], p[o + 1], p[o + 2], p[o + 3] = 0, 0, 0, a
     end
+    local q = ffi.cast("uint8_t*", self.expData:getFFIPointer())
+    for i = 0, self.w * self.h - 1 do q[i] = exp[i] ~= 0 and 255 or 0 end
     if self.image then
         self.image:replacePixels(self.data)
+        self.expImage:replacePixels(self.expData)
     else
         self.image = love.graphics.newImage(self.data)
         self.image:setFilter("linear", "linear")
+        self.expImage = love.graphics.newImage(self.expData)
+        self.expImage:setFilter("linear", "linear")
     end
     self.dirty = false
 end
+
+-- The sight circles: SIGHT_PX map pixels a texel of the canvas; a circle is clear up to FADE_PX inside its edge and
+-- fades out to SOFT_PX beyond it. Its edge is the last cell centre a stamp of that radius takes (r * 32 + 16 px: the
+-- stamp's ellipse in cells is a circle in pixels), so an army in the last seen cell stands in the fading edge.
+local SIGHT_PX, FADE_PX, SOFT_PX = 8, 40, 8
+local discs = {}
+
+---@param r integer the radius in cells
+---@return love.Image
+local function disc(r)
+    local img = discs[r]
+    if img then return img end
+    local outer = (r * 32 + 16 + SOFT_PX) / SIGHT_PX         -- in texels
+    local fade = FADE_PX / SIGHT_PX
+    local n = math.ceil(outer) * 2 + 2
+    local data = love.image.newImageData(n, n)
+    local c = n / 2
+    data:mapPixel(function(x, y)
+        local d = math.sqrt((x + 0.5 - c) ^ 2 + (y + 0.5 - c) ^ 2)
+        local v = math.max(0, math.min(1, (outer - d) / fade))
+        v = v * v * (3 - 2 * v)
+        return v, v, v, 1
+    end)
+    img = love.graphics.newImage(data)
+    img:setFilter("linear", "linear")
+    discs[r] = img
+    return img
+end
+
+-- What the fog shader draws: the sight canvas clears, the explored ground dims (`dim`) instead of hiding.
+local SHADER = [[
+uniform Image seen;
+uniform float dim;
+vec4 effect(vec4 colour, Image sight, vec2 uv, vec2 sc) {
+    float v = Texel(sight, uv).r;
+    float e = Texel(seen, uv).r;
+    return vec4(0.0, 0.0, 0.0, (1.0 - v) * mix(1.0, dim, e)) * colour;
+}
+]]
+local shader
 
 -- Draws the fog over the map (world coordinates).
 function Fog:draw()
     if not self.enabled then return end
     if self.dirty or not self.image then self:refreshTexture() end
-    -- texel centres line up with cell centres
-    love.graphics.setColor(1, 1, 1)
-    love.graphics.draw(self.image, 0, 0, 0, 32, 24)
+    local g = love.graphics
+    if not require("src.core.gameopts").get("smoothfog") then
+        -- by cells: the texture stretched over the map, texel centres on cell centres
+        g.setColor(1, 1, 1)
+        g.draw(self.image, 0, 0, 0, 32, 24)
+        self.sight, self.seen = nil, nil                    -- Modern starts over from the cells when picked again
+        self.uncovered = true
+        return
+    end
+    local cw, ch = self.w * 32 / SIGHT_PX, self.h * 24 / SIGHT_PX
+    if not self.sight then
+        self.sight, self.seen = g.newCanvas(cw, ch), g.newCanvas(cw, ch)
+        self.sight:setFilter("linear", "linear")
+        self.seen:setFilter("linear", "linear")
+        g.push("all")
+        g.setCanvas(self.seen)
+        g.clear(0, 0, 0, 1)
+        g.pop()
+    end
+    shader = shader or g.newShader(SHADER)
+    g.push("all")
+    g.origin()
+    g.setCanvas(self.sight)
+    g.clear(0, 0, 0, 1)
+    g.setBlendMode("lighten", "premultiplied")             -- overlapping circles: the clearer one wins
+    g.setColor(1, 1, 1)
+    self:eachViewer(function(_, _, r, x, y)
+        local img = disc(r)
+        local half = img:getWidth() / 2
+        g.draw(img, x / SIGHT_PX - half, y / SIGHT_PX - half)
+    end)
+    g.setCanvas(self.seen)
+    g.draw(self.sight)
+    if self.uncovered then                                  -- an explored map, a saved game, Farseeing, an event
+        self.uncovered = false
+        g.draw(self.expImage, 0, 0, 0, 32 / SIGHT_PX, 24 / SIGHT_PX)
+    end
+    g.pop()
+    shader:send("seen", self.seen)
+    shader:send("dim", self.dim / 255)
+    g.setShader(shader)
+    g.setColor(1, 1, 1)
+    g.draw(self.sight, 0, 0, 0, SIGHT_PX, SIGHT_PX)
+    g.setShader()
 end
 
 -- The simulation's own sight (not drawn) ---------------------------------------------------------------------------

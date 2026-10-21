@@ -137,6 +137,7 @@ function S:enter(scn, opts)
     elseif self.fogMode == 2 then
         local ffi = require("ffi")
         ffi.fill(self.fog.explored, self.fog.w * self.fog.h, 1)
+        self.fog.uncovered = true
     end
     if opts.restore then require("src.game.savegame").apply(self, opts.restore) end
     -- the game speed picked in the setup (opts.gameSpeed 0..4; the original starts a game at that + 1 of its timer steps);
